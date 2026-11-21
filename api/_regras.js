@@ -63,11 +63,17 @@ function sanitizarLote(corpo, geo) {
     if (!secao || xr === null || yr === null) return;
     eventos.push({ tipo: e.tipo, secao, xr, yr, alvo: e.tipo === 'click' ? (String(e.alvo || '').slice(0, 80) || null) : null });
   });
+  // tempo em cada pagina desde o ultimo lote (ms) e a pagina que esta na tela agora
+  const tempos = {};
+  if (c.tempos && typeof c.tempos === 'object') {
+    Object.keys(c.tempos).slice(0, 40).forEach((k) => { const ms = inteiro(c.tempos[k], 0, 120000); if (IDS_SECOES.has(k) && ms) tempos[k] = ms; });
+  }
+  const atual = IDS_SECOES.has(c.atual) ? c.atual : null;
   const g = geo || {};
   return {
     ok: true,
     lote: {
-      sessao, visitante, site,
+      sessao, visitante, site, tempos, atual,
       origem: classificarOrigem(c.origem, referencia, site),
       referencia: referencia && referencia !== site ? referencia : null,
       campanha: slug(c.campanha, 60),
@@ -84,6 +90,10 @@ function geoDosCabecalhos(h) {
   return { cidade: dec(h['x-vercel-ip-city']), estado: dec(h['x-vercel-ip-country-region']), pais: dec(h['x-vercel-ip-country']) };
 }
 
+// robos pelo nome que o navegador informa (buscadores, previa de link, verificacoes automaticas)
+const ROBO = /bot|crawl|spider|slurp|headless|lighthouse|vercel|facebookexternalhit|whatsapp|preview|pingdom|uptime|python|curl|wget|axios|node-fetch|go-http/i;
+function ehRobo(ua) { return !ua || ROBO.test(String(ua)); }
+
 function origemPermitida(origin, extras) {
   let host = '';
   try { host = new URL(String(origin || '')).host.toLowerCase(); } catch (e) { host = ''; }
@@ -92,26 +102,4 @@ function origemPermitida(origin, extras) {
   return lista.some((d) => host === d || host.endsWith('.' + d)) || /^book-villagio-caucaia-2-[a-z0-9-]+\.vercel\.app$/.test(host);
 }
 
-// o resumo do painel a partir das visitas do periodo (cada uma com inicio, ultima_em, origem, aparelho, cidade, estado, secoes, whatsapp, visitante)
-function resumir(visitas, hoje) {
-  const total = visitas.length;
-  const unicos = new Set(visitas.map((v) => v.visitante)).size;
-  const wa = visitas.filter((v) => v.whatsapp).length;
-  const tempos = visitas.map((v) => Math.max(0, (new Date(v.ultima_em) - new Date(v.inicio)) / 1000)).filter((s) => s > 0).sort((a, b) => a - b);
-  const mediana = tempos.length ? Math.round(tempos[Math.floor(tempos.length / 2)]) : 0;
-  const contar = (f) => { const m = {}; visitas.forEach((v) => { const k = f(v) || 'não informado'; m[k] = (m[k] || 0) + 1; }); return Object.entries(m).map(([nome, n]) => ({ nome, n })).sort((a, b) => b.n - a.n); };
-  const dia = (d) => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date(d));
-  const porDia = {};
-  visitas.forEach((v) => { const k = dia(v.inicio); porDia[k] = porDia[k] || { dia: k, visitas: 0, whatsapp: 0 }; porDia[k].visitas++; if (v.whatsapp) porDia[k].whatsapp++; });
-  const funil = SECOES.map(([id, nome]) => ({ id, nome, n: visitas.filter((v) => (v.secoes || []).includes(id)).length }));
-  const voltaram = (() => { const m = {}; visitas.forEach((v) => { m[v.visitante] = (m[v.visitante] || 0) + 1; }); return Object.values(m).filter((n) => n > 1).length; })();
-  return {
-    total, unicos, voltaram, whatsapp: wa, conversao: total ? Math.round((wa / total) * 1000) / 10 : 0, tempoMediano: mediana,
-    porDia: Object.values(porDia).sort((a, b) => a.dia.localeCompare(b.dia)),
-    origens: contar((v) => v.origem), aparelhos: contar((v) => v.aparelho),
-    cidades: contar((v) => (v.cidade ? v.cidade + (v.estado ? ' / ' + v.estado : '') : null)).slice(0, 12),
-    funil
-  };
-}
-
-module.exports = { SECOES, IDS_SECOES, LIMITE_POR_LOTE, aparelho, classificarOrigem, sanitizarLote, geoDosCabecalhos, origemPermitida, resumir };
+module.exports = { SECOES, IDS_SECOES, LIMITE_POR_LOTE, aparelho, classificarOrigem, sanitizarLote, geoDosCabecalhos, origemPermitida, ehRobo };

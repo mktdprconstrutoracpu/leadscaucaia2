@@ -20,6 +20,8 @@
 
   var hash = new URLSearchParams((location.hash || '').replace(/^#/, ''));
   if (hash.get('mapaleads')) { mapa(); return; }
+  // robos (navegador automatico, buscadores, previa de link, verificacao da Vercel) nao contam como visita
+  if (navigator.webdriver || /bot|crawl|spider|slurp|headless|lighthouse|vercel|facebookexternalhit|whatsapp|preview|pingdom|uptime/i.test(navigator.userAgent || '')) return;
   coletar();
 
   function idNovo() { return (Math.random().toString(36).slice(2, 12) + Date.now().toString(36)).replace(/[^a-z0-9]/g, ''); }
@@ -98,12 +100,34 @@
       if (p) add({ tipo: 'move', secao: p.secao, xr: p.xr, yr: p.yr });
     }, { passive: true });
 
+    // tempo em cada pagina: a cada segundo com a aba visivel, soma 1 s na pagina que mais ocupa a tela
+    var tempos = {}, atual = '', atualEnviada = '';
+    function paginaNaTela() {
+      var melhor = '', area = 0, vh = window.innerHeight;
+      document.querySelectorAll('section[id]').forEach(function (s) {
+        var r = s.getBoundingClientRect();
+        var vis = Math.min(r.bottom, vh) - Math.max(r.top, 0);
+        if (vis > area) { area = vis; melhor = s.id; }
+      });
+      return melhor;
+    }
+    setInterval(function () {
+      if (document.hidden) return;
+      var p = paginaNaTela();
+      if (!p) return;
+      atual = p;
+      tempos[p] = (tempos[p] || 0) + 1000;
+    }, 1000);
+
     var primeiro = true;
     function enviar(forcar) {
       var lote = fila.splice(0, fila.length);
-      if (!lote.length && !forcar && !primeiro) return;
+      var temTempo = Object.keys(tempos).length > 0;
+      if (!lote.length && !temTempo && !forcar && !primeiro) return;
       enviados += lote.length;
       var corpo = { sessao: sessao, visitante: visitante, site: location.host, vw: window.innerWidth, vh: window.innerHeight, eventos: lote };
+      if (temTempo) { corpo.tempos = tempos; tempos = {}; }
+      if (atual && atual !== atualEnviada) { corpo.atual = atual; atualEnviada = atual; }
       if (primeiro) {
         corpo.origem = q.get('origem') || q.get('utm_source') || '';
         corpo.campanha = q.get('utm_campaign') || '';

@@ -8,7 +8,9 @@
 <!--
   Painel do rastreio do book digital do Villagio Caucaia II (caucaia2.construtoradpr.com.br).
   So a equipe da lista AUTORIZADOS (variavel na Vercel) entra, com o login do Supabase da DPR.
-  Dados: api/resumo.js (visitas do periodo) e api/ticket.js + t.js (mapa de calor por cima do book).
+  Dados: api/resumo.js (visitas do periodo e do anterior, cliques e meta), api/agora.js (quem esta lendo),
+  api/jornada.js (linha do tempo de uma visita) e api/meta.js (grava a meta do mes).
+  Os quadros sao calculados aqui, a partir das visitas, para os filtros valerem para todos juntos.
 -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -38,6 +40,7 @@
   .bt:hover { border-color: var(--primary); }
   .bt.cheio { background: var(--accent); border-color: var(--accent); color: var(--white); box-shadow: 0 10px 24px rgba(225, 6, 0, .2); }
   .bt.cheio:hover { background: var(--accent-escuro); }
+  .bt.pequeno { min-height: 34px; padding: 0 12px; font-size: 13px; }
   .bt:disabled { opacity: .45; cursor: default; }
 
   /* entrada */
@@ -69,97 +72,147 @@
   .topo .bt { background: transparent; border-color: rgba(255, 255, 255, .2); color: var(--white); min-height: 34px; }
   .topo .bt:hover { background: var(--white); color: var(--primary); }
 
-  .conteudo { max-width: 1240px; margin: 0 auto; padding: 28px clamp(16px, 3vw, 40px) 60px; display: grid; gap: 20px; }
+  .conteudo { max-width: 1280px; margin: 0 auto; padding: 26px clamp(16px, 3vw, 40px) 60px; display: grid; gap: 18px; }
   .cabeca { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
   .cabeca h1 { font-size: 30px; }
-  .cabeca p { margin: 4px 0 0; color: var(--text-light); max-width: 60ch; line-height: 1.5; }
+  .cabeca p { margin: 4px 0 0; color: var(--text-light); max-width: 62ch; line-height: 1.5; }
   .periodo { display: inline-flex; background: var(--white); border: 1px solid var(--border); border-radius: 12px; padding: 3px; gap: 2px; }
   .periodo button { appearance: none; border: 0; background: none; border-radius: 9px; padding: 7px 12px; font-weight: 600; color: var(--text-light); cursor: pointer; }
   .periodo button.ativo { background: var(--primary); color: var(--white); }
   .aviso-erro { padding: 14px 16px; border-radius: 12px; background: var(--accent-leve); color: var(--accent-escuro); font-weight: 600; }
 
+  /* agora */
+  .agora { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 12px 16px; border-radius: 14px; background: var(--grafite); color: var(--white); }
+  .agora .pulso { width: 10px; height: 10px; border-radius: 50%; background: #3ad06c; box-shadow: 0 0 0 0 rgba(58, 208, 108, .6); animation: pulso 2s infinite; flex: 0 0 auto; }
+  .agora.vazio .pulso { background: #6b6f78; animation: none; }
+  .agora b { font-family: var(--display); font-size: 15px; }
+  .agora .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .agora .chip { font-size: 12.5px; background: rgba(255, 255, 255, .1); border-radius: 999px; padding: 4px 10px; color: rgba(255, 255, 255, .85); }
+  @keyframes pulso { 70% { box-shadow: 0 0 0 10px rgba(58, 208, 108, 0); } 100% { box-shadow: 0 0 0 0 rgba(58, 208, 108, 0); } }
+
+  /* filtros */
+  .filtros { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 12px 14px; background: var(--white); border-radius: 14px; box-shadow: var(--sombra); }
+  .filtros select { min-height: 38px; border: 1px solid var(--border); border-radius: 10px; padding: 0 10px; background: var(--white); font-size: 14px; max-width: 220px; }
+  .filtros label.marca { display: inline-flex; gap: 8px; align-items: center; font-size: 13px; color: var(--text-light); }
+  .filtros .dir { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; }
+
   .cartao { background: var(--white); border-radius: var(--raio); box-shadow: var(--sombra); padding: 20px 22px; min-width: 0; }
   .cartao h2 { font-size: 17px; display: flex; align-items: center; gap: 10px; }
-  .cartao h2::before { content: ''; width: 3px; height: 17px; border-radius: 2px; background: var(--accent); }
+  .cartao h2::before { content: ''; width: 3px; height: 17px; border-radius: 2px; background: var(--accent); flex: 0 0 auto; }
   .cartao .sub { margin: 6px 0 0; color: var(--text-light); font-size: 13px; line-height: 1.5; }
+  .vazio { color: var(--text-fraco); font-size: 13.5px; margin: 14px 0 0; }
 
   .kpis { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
-  .kpi { background: var(--white); border-radius: var(--raio); box-shadow: var(--sombra); padding: 16px 18px; display: grid; gap: 4px; }
+  .kpi { background: var(--white); border-radius: var(--raio); box-shadow: var(--sombra); padding: 16px 18px; display: grid; gap: 4px; align-content: start; }
   .kpi span { font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--text-light); }
   .kpi b { font-family: var(--display); font-size: 30px; color: var(--primary); letter-spacing: -.02em; line-height: 1.1; }
   .kpi small { color: var(--text-light); font-size: 12.5px; }
+  .kpi .delta { font-size: 12px; font-weight: 700; }
+  .delta.sobe { color: var(--verde); } .delta.desce { color: var(--accent); } .delta.igual { color: var(--text-fraco); }
   .kpi.destaque { background: var(--grafite); }
   .kpi.destaque span, .kpi.destaque small { color: rgba(255, 255, 255, .6); }
   .kpi.destaque b { color: var(--white); }
+  .kpi.destaque .delta.sobe { color: #6fe39a; } .kpi.destaque .delta.desce { color: #ff8a80; }
+
+  .duas { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 18px; }
+  .metades { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
 
   /* visitas por dia */
-  .dias { display: flex; align-items: flex-end; gap: 3px; height: 150px; margin-top: 18px; padding-bottom: 22px; position: relative; overflow-x: auto; }
-  .dia { flex: 1 1 0; min-width: 4px; display: flex; flex-direction: column; justify-content: flex-end; align-items: stretch; height: 100%; position: relative; }
+  .dias { display: flex; align-items: flex-end; gap: 3px; height: 150px; margin-top: 18px; padding-bottom: 22px; position: relative; }
+  .dia { flex: 1 1 0; min-width: 4px; display: flex; flex-direction: column; justify-content: flex-end; height: 100%; position: relative; }
   .dia .barra { background: #d9d4cc; border-radius: 4px 4px 0 0; position: relative; min-height: 2px; }
   .dia .barra i { position: absolute; left: 0; right: 0; bottom: 0; background: var(--accent); border-radius: 4px 4px 0 0; }
   .dia small { position: absolute; bottom: -20px; left: 50%; transform: translateX(-50%); font-size: 10.5px; color: var(--text-fraco); white-space: nowrap; }
-  .legenda { display: flex; gap: 16px; margin-top: 10px; font-size: 12.5px; color: var(--text-light); }
+  .legenda { display: flex; gap: 16px; margin-top: 10px; font-size: 12.5px; color: var(--text-light); flex-wrap: wrap; }
   .legenda span { display: inline-flex; align-items: center; gap: 6px; }
   .legenda i { width: 10px; height: 10px; border-radius: 3px; background: #d9d4cc; }
   .legenda i.wa { background: var(--accent); }
 
-  .tres { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
+  /* meta */
+  .meta-num { font-family: var(--display); font-size: 40px; color: var(--primary); margin-top: 14px; line-height: 1; }
+  .meta-num small { font-size: 18px; color: var(--text-light); }
+  .meta-trilho { height: 12px; border-radius: 6px; background: var(--linha); overflow: hidden; margin: 14px 0 8px; }
+  .meta-trilho i { display: block; height: 100%; background: var(--accent); border-radius: 6px; }
+  .meta-trilho.batida i { background: var(--verde); }
+  .meta-edita { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+  .meta-edita input { width: 110px; min-height: 34px; border: 1px solid var(--border); border-radius: 10px; padding: 0 10px; font-size: 15px; }
+
+  /* leads quentes */
+  .quentes { list-style: none; margin: 14px 0 0; padding: 0; display: grid; gap: 10px; }
+  .quente { display: grid; grid-template-columns: 52px minmax(0, 1fr) auto; gap: 14px; align-items: center; padding: 12px 14px; border: 1px solid var(--border); border-radius: 14px; }
+  .quente .nota { width: 52px; height: 52px; border-radius: 14px; display: grid; place-items: center; font-family: var(--display); font-size: 20px; font-weight: 800; color: var(--white); background: var(--accent); }
+  .quente .nota.morna { background: var(--ambar); }
+  .quente b { color: var(--primary); }
+  .quente .quem-q { font-size: 13px; color: var(--text-light); margin-top: 2px; }
+  .quente .motivos { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
+  .quente .motivos span { font-size: 11.5px; font-weight: 600; background: var(--fundo); border-radius: 8px; padding: 2px 8px; }
+
+  /* tabelas e listas */
+  .tabela { margin-top: 14px; overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--text-light); padding: 9px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  th.dir, td.dir { text-align: right; }
+  td { padding: 10px; border-bottom: 1px solid var(--linha); vertical-align: top; font-size: 13.5px; }
+  td b { color: var(--primary); }
   .lista-barras { list-style: none; margin: 14px 0 0; padding: 0; display: grid; gap: 10px; }
   .lista-barras li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 10px; font-size: 13.5px; }
   .lista-barras li b { font-weight: 600; color: var(--primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .lista-barras li em { font-style: normal; color: var(--text-light); }
   .lista-barras li .trilho { grid-column: 1 / -1; height: 6px; border-radius: 3px; background: var(--linha); overflow: hidden; }
   .lista-barras li .trilho i { display: block; height: 100%; background: var(--primary); border-radius: 3px; }
-  .vazio { color: var(--text-fraco); font-size: 13.5px; margin: 14px 0 0; }
 
   /* funil */
-  .funil { list-style: none; margin: 16px 0 0; padding: 0; display: grid; gap: 7px; }
-  .funil li { display: grid; grid-template-columns: 34px minmax(140px, 220px) minmax(0, 1fr) 92px; align-items: center; gap: 12px; font-size: 13.5px; }
-  .funil .pg { font-family: var(--display); font-weight: 800; color: var(--text-fraco); font-size: 12px; }
-  .funil .nome { font-weight: 600; color: var(--primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .funil .trilho { height: 14px; border-radius: 4px; background: var(--linha); overflow: hidden; }
+  .destaque-saida { margin: 12px 0 0; padding: 10px 14px; border-radius: 12px; background: var(--accent-leve); color: var(--accent-escuro); font-weight: 600; font-size: 13.5px; }
+  .funil { width: 100%; margin-top: 12px; }
+  .funil td { vertical-align: middle; }
+  .funil .pg { font-family: var(--display); font-weight: 800; color: var(--text-fraco); font-size: 12px; width: 34px; }
+  .funil .nome { font-weight: 600; color: var(--primary); white-space: nowrap; }
+  .funil .trilho { height: 12px; border-radius: 4px; background: var(--linha); overflow: hidden; min-width: 80px; }
   .funil .trilho i { display: block; height: 100%; background: linear-gradient(90deg, var(--grafite), #3a3c44); border-radius: 4px; }
-  .funil li:last-child .trilho i { background: var(--accent); }
-  .funil .val { text-align: right; color: var(--text-light); }
-  .funil .val b { color: var(--primary); }
+  .funil tr.pior td { background: rgba(225, 6, 0, .05); }
+  .funil tr.pior .saiu { color: var(--accent); font-weight: 700; }
 
-  /* mapa */
-  .mapas { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 16px; }
-  .mapa-op { border: 1px solid var(--border); border-radius: 14px; padding: 16px; display: grid; gap: 10px; align-content: start; }
-  .mapa-op b { font-family: var(--display); font-size: 15px; color: var(--primary); }
-  .mapa-op p { margin: 0; color: var(--text-light); font-size: 13px; line-height: 1.45; }
-
-  /* link marcado */
-  .gerar { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; align-items: center; }
-  .gerar select, .gerar input { min-height: 40px; border: 1px solid var(--border); border-radius: 12px; padding: 0 12px; background: var(--white); font-size: 15px; }
-  .gerar code { flex: 1 1 320px; min-width: 0; padding: 10px 12px; border-radius: 12px; background: var(--fundo); font-size: 13px; overflow-wrap: anywhere; }
+  /* grade dia x hora */
+  .grade { margin-top: 14px; overflow-x: auto; }
+  .grade table { border-collapse: separate; border-spacing: 2px; min-width: 560px; }
+  .grade td, .grade th { padding: 0; border: 0; text-align: center; font-size: 10.5px; color: var(--text-fraco); font-weight: 600; letter-spacing: 0; text-transform: none; }
+  .grade th.dia-s { text-align: right; padding-right: 6px; color: var(--text-light); }
+  .grade td.c { width: 20px; height: 20px; border-radius: 4px; background: var(--linha); }
 
   /* visitas */
-  .tabela { margin-top: 14px; overflow-x: auto; }
-  table { width: 100%; border-collapse: collapse; min-width: 760px; }
-  th { text-align: left; font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--text-light); padding: 10px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; }
-  td { padding: 11px 10px; border-bottom: 1px solid var(--linha); vertical-align: top; font-size: 13.5px; }
+  .visitas-tab { min-width: 760px; }
   tr.visita { cursor: pointer; }
   tr.visita:hover td { background: #faf8f5; }
-  td .cap { text-transform: capitalize; }
   .selo { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 700; border-radius: 999px; padding: 2px 9px; white-space: nowrap; }
   .selo.wa { background: var(--verde-leve); color: var(--verde); }
   .selo.nao { background: var(--linha); color: var(--text-fraco); }
   .selo.volta { background: var(--ambar-leve); color: var(--ambar); }
-  .caminho { display: flex; flex-wrap: wrap; gap: 5px; padding: 4px 0 6px; }
-  .caminho span { font-size: 12px; background: var(--fundo); border-radius: 8px; padding: 3px 8px; color: var(--text); }
-  .caminho span.ult { background: var(--grafite); color: var(--white); }
   .pags { display: inline-flex; align-items: center; gap: 8px; }
   .pags .mini { width: 60px; height: 5px; border-radius: 3px; background: var(--linha); overflow: hidden; }
   .pags .mini i { display: block; height: 100%; background: var(--primary); }
+  .jornada { padding: 8px 4px 12px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; }
+  .jornada h3 { font-size: 13px; margin-bottom: 8px; }
+  .linha-tempo { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+  .linha-tempo li { display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 10px; font-size: 13px; }
+  .linha-tempo li time { color: var(--text-fraco); font-variant-numeric: tabular-nums; }
+  .linha-tempo li.wa { color: var(--verde); font-weight: 700; }
+  .tempos-pag { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+  .tempos-pag li { display: grid; grid-template-columns: minmax(0, 1fr) 60px; gap: 4px 10px; font-size: 12.5px; }
+  .tempos-pag li .trilho { grid-column: 1 / -1; height: 5px; border-radius: 3px; background: var(--linha); overflow: hidden; }
+  .tempos-pag li .trilho i { display: block; height: 100%; background: var(--accent); }
+
+  /* link marcado */
+  .gerar { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; align-items: center; }
+  .gerar select { min-height: 40px; border: 1px solid var(--border); border-radius: 12px; padding: 0 12px; background: var(--white); font-size: 15px; }
+  .gerar code { flex: 1 1 320px; min-width: 0; padding: 10px 12px; border-radius: 12px; background: var(--fundo); font-size: 13px; overflow-wrap: anywhere; }
 
   .aviso { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); background: var(--grafite); color: var(--white); padding: 12px 18px; border-radius: 12px; box-shadow: 0 16px 40px rgba(0, 0, 0, .25); z-index: 50; font-weight: 600; max-width: calc(100vw - 32px); }
   .aviso.erro { background: var(--accent); }
 
-  @media (max-width: 1000px) {
+  @media (max-width: 1050px) {
     .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .kpi.destaque { grid-column: 1 / -1; }
-    .tres, .mapas { grid-template-columns: 1fr; }
+    .duas, .metades { grid-template-columns: 1fr; }
   }
   @media (max-width: 760px) {
     .entrada { grid-template-columns: 1fr; }
@@ -167,11 +220,16 @@
     .topo .quem { display: none; }
     .topo .bt { margin-left: auto; }
     .cabeca h1 { font-size: 26px; }
-    .funil li { grid-template-columns: 28px minmax(0, 1fr) 74px; }
-    .funil .trilho { grid-column: 2 / -1; grid-row: 2; }
     .cartao { padding: 18px 16px; }
+    .filtros select { flex: 1 1 140px; max-width: none; }
+    .filtros .dir { margin-left: 0; width: 100%; }
+    .quente { grid-template-columns: 46px minmax(0, 1fr); }
+    .quente .nota { width: 46px; height: 46px; font-size: 18px; }
+    .quente .bt { grid-column: 1 / -1; }
+    .jornada { grid-template-columns: 1fr; }
+    .funil .esconde-cel { display: none; }
   }
-  @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+  @media (prefers-reduced-motion: reduce) { .agora .pulso { animation: none; } }
 </style>
 </head>
 <body>
@@ -181,7 +239,7 @@
     <img src="logo-dpr-claro.png" alt="DPR Construtora">
     <div>
       <h2 class="entrada-titulo">Quem abriu o <span>book</span> do Caucaia II.</h2>
-      <p class="entrada-texto">Visitas, de onde vieram, até onde leram, quem chamou no WhatsApp e o mapa de calor das páginas. Tudo anônimo.</p>
+      <p class="entrada-texto">Visitas, de onde vieram, até onde leram, quem chamou no WhatsApp e os leads mais quentes. Tudo anônimo.</p>
     </div>
     <small style="color:rgba(255,255,255,.4)">Uso interno da equipe DPR</small>
   </div>
@@ -208,7 +266,7 @@
     <div class="cabeca">
       <div>
         <h1>Quem entrou no book</h1>
-        <p>Visitas ao <a href="https://caucaia2.construtoradpr.com.br/" target="_blank" rel="noopener">caucaia2.construtoradpr.com.br</a>. Cada visita é uma aba aberta; ninguém é identificado por nome ou telefone.</p>
+        <p>Visitas ao <a href="https://caucaia2.construtoradpr.com.br/" target="_blank" rel="noopener">caucaia2.construtoradpr.com.br</a>. Cada visita é uma aba aberta; ninguém é identificado por nome ou telefone. Robôs não entram na conta.</p>
       </div>
       <div class="periodo" role="group" aria-label="Período">
         <button type="button" data-dias="7">7 dias</button><button type="button" data-dias="30" class="ativo">30 dias</button><button type="button" data-dias="90">90 dias</button><button type="button" data-dias="180">180 dias</button>
@@ -216,45 +274,98 @@
     </div>
     <div class="aviso-erro" id="erroGeral" hidden></div>
 
+    <div class="agora vazio" id="agora" aria-live="polite"><span class="pulso"></span><b id="agoraTexto">Ninguém lendo o book agora</b><div class="chips" id="agoraChips"></div></div>
+
+    <div class="filtros" role="group" aria-label="Filtros">
+      <select id="fOrigem" aria-label="Origem"></select>
+      <select id="fCampanha" aria-label="Campanha"></select>
+      <select id="fAparelho" aria-label="Aparelho"></select>
+      <select id="fCidade" aria-label="Cidade"></select>
+      <label class="marca"><input type="checkbox" id="fSemLeitura"> Incluir visitas sem leitura</label>
+      <div class="dir">
+        <button class="bt pequeno" type="button" id="btLimpar">Limpar filtros</button>
+        <button class="bt pequeno" type="button" id="btExportar">Exportar para Excel</button>
+      </div>
+    </div>
+
     <section class="kpis" aria-label="Resumo">
-      <div class="kpi destaque"><span>Chamaram no WhatsApp</span><b class="num" id="kWa">0</b><small id="kConv">0% das visitas</small></div>
-      <div class="kpi"><span>Visitas</span><b class="num" id="kVisitas">0</b><small>abas abertas no período</small></div>
-      <div class="kpi"><span>Pessoas</span><b class="num" id="kUnicos">0</b><small id="kVoltaram">0 voltaram</small></div>
-      <div class="kpi"><span>Tempo típico</span><b class="num" id="kTempo">0s</b><small>metade fica mais que isso</small></div>
-      <div class="kpi"><span>Leram até o fim</span><b class="num" id="kFim">0%</b><small>chegaram em "Fale com a DPR"</small></div>
+      <div class="kpi destaque"><span>Chamaram no WhatsApp</span><b class="num" id="kWa">0</b><small id="kConv">0% das visitas</small><small class="delta" id="dWa"></small></div>
+      <div class="kpi"><span>Visitas</span><b class="num" id="kVisitas">0</b><small>abas abertas com leitura</small><small class="delta" id="dVisitas"></small></div>
+      <div class="kpi"><span>Pessoas</span><b class="num" id="kUnicos">0</b><small id="kVoltaram">0 voltaram</small><small class="delta" id="dUnicos"></small></div>
+      <div class="kpi"><span>Tempo típico</span><b class="num" id="kTempo">0s</b><small>metade fica mais que isso</small><small class="delta" id="dTempo"></small></div>
+      <div class="kpi"><span>Leram até o fim</span><b class="num" id="kFim">0%</b><small>chegaram em "Fale com a DPR"</small><small class="delta" id="dFim"></small></div>
     </section>
 
-    <section class="cartao">
-      <h2>Visitas por dia</h2>
-      <div class="dias" id="dias"></div>
-      <div class="legenda"><span><i></i>Visitas</span><span><i class="wa"></i>Chamaram no WhatsApp</span></div>
-    </section>
-
-    <div class="tres">
-      <section class="cartao"><h2>De onde vieram</h2><ul class="lista-barras" id="origens"></ul></section>
-      <section class="cartao"><h2>Aparelho</h2><ul class="lista-barras" id="aparelhos"></ul></section>
-      <section class="cartao"><h2>Cidades</h2><p class="sub">Aproximada, pelo provedor de internet.</p><ul class="lista-barras" id="cidades"></ul></section>
+    <div class="duas">
+      <section class="cartao">
+        <h2>Visitas por dia</h2>
+        <div class="dias" id="dias"></div>
+        <div class="legenda"><span><i></i>Visitas</span><span><i class="wa"></i>Chamaram no WhatsApp</span></div>
+      </section>
+      <section class="cartao">
+        <h2>Meta do mês</h2>
+        <p class="sub">Contatos pelo WhatsApp vindos do book neste mês (sem filtros).</p>
+        <div class="meta-num num" id="metaNum">0</div>
+        <div class="meta-trilho" id="metaTrilho"><i style="width:0%"></i></div>
+        <p class="sub" id="metaTexto">Sem meta definida.</p>
+        <div class="meta-edita"><input type="number" min="0" max="100000" id="metaValor" aria-label="Meta de contatos no mês"><button class="bt pequeno" type="button" id="btMeta">Salvar meta</button></div>
+      </section>
     </div>
 
     <section class="cartao">
-      <h2>Até onde leram</h2>
-      <p class="sub">Quantas visitas chegaram a cada página do book, na ordem do book.</p>
-      <ul class="funil" id="funil"></ul>
+      <h2>Leads quentes</h2>
+      <p class="sub">Quem mais mostrou interesse no período: voltou mais de uma vez, leu as páginas de decisão (Financiamento, Ficha técnica, As casas), ficou bastante tempo ou chamou no WhatsApp. A nota vai de 0 a 100.</p>
+      <ul class="quentes" id="quentes"></ul>
     </section>
 
     <section class="cartao">
-      <h2>Mapa de calor</h2>
-      <p class="sub">Abre o book de verdade com o calor desenhado por cima. O desenho do book muda entre celular e computador: abra o mapa de celular no celular e o de computador no computador.</p>
-      <div class="mapas">
-        <div class="mapa-op"><b>Cliques no celular</b><p>Onde as pessoas tocaram, no celular.</p><button class="bt cheio" type="button" data-mapa="click" data-aparelho="celular">Abrir mapa</button></div>
-        <div class="mapa-op"><b>Cliques no computador</b><p>Onde clicaram com o mouse.</p><button class="bt cheio" type="button" data-mapa="click" data-aparelho="computador">Abrir mapa</button></div>
-        <div class="mapa-op"><b>Movimento do mouse</b><p>Por onde o mouse passou: o que chamou a atenção no computador.</p><button class="bt cheio" type="button" data-mapa="move" data-aparelho="computador">Abrir mapa</button></div>
-      </div>
+      <h2>Até onde leram e onde desistem</h2>
+      <p class="sub">Cada página do book, na ordem: quantas visitas chegaram, o tempo médio de quem viu e quantas pararam ali.</p>
+      <div class="destaque-saida" id="destaqueSaida" hidden></div>
+      <div class="tabela"><table class="funil"><thead><tr><th></th><th>Página</th><th class="esconde-cel">Chegaram</th><th class="dir">Visitas</th><th class="dir">Tempo médio</th><th class="dir">Pararam aqui</th></tr></thead><tbody id="funil"></tbody></table></div>
     </section>
+
+    <div class="duas">
+      <section class="cartao">
+        <h2>Qualidade por origem</h2>
+        <p class="sub">Não só quantas visitas cada canal traz: quantas leram até o fim e quantas chamaram no WhatsApp.</p>
+        <div class="tabela"><table><thead><tr><th>Origem</th><th class="dir">Visitas</th><th class="dir">Leram até o fim</th><th class="dir">WhatsApp</th><th class="dir">Tempo típico</th></tr></thead><tbody id="porOrigem"></tbody></table></div>
+      </section>
+      <section class="cartao">
+        <h2>Celular x computador</h2>
+        <div class="tabela"><table><thead><tr><th>Aparelho</th><th class="dir">Visitas</th><th class="dir">WhatsApp</th><th class="dir">Tempo</th></tr></thead><tbody id="porAparelho"></tbody></table></div>
+      </section>
+    </div>
+
+    <div class="metades">
+      <section class="cartao">
+        <h2>O que mais clicam</h2>
+        <p class="sub">Os elementos do book mais tocados pelas visitas do filtro.</p>
+        <ul class="lista-barras" id="cliques"></ul>
+      </section>
+      <section class="cartao">
+        <h2>Melhor dia e horário</h2>
+        <p class="sub">Quando mais gente abre o book (horário de Brasília). Quanto mais escuro, mais visitas.</p>
+        <div class="grade" id="grade"></div>
+      </section>
+    </div>
+
+    <div class="metades">
+      <section class="cartao">
+        <h2>Voltaram ao book</h2>
+        <p class="sub">Quem abriu o book mais de uma vez no período: quem volta está decidindo.</p>
+        <ul class="lista-barras" id="voltaram"></ul>
+      </section>
+      <section class="cartao">
+        <h2>Cidades</h2>
+        <p class="sub">Aproximada, pelo provedor de internet.</p>
+        <ul class="lista-barras" id="cidades"></ul>
+      </section>
+    </div>
 
     <section class="cartao">
       <h2>Links marcados para divulgar</h2>
-      <p class="sub">Use um link diferente em cada canal: assim o painel mostra de onde veio cada visita. Quem chega sem marca aparece pelo site de origem ou como "direto".</p>
+      <p class="sub">Use um link diferente em cada canal (e um por corretor): assim o painel mostra de onde veio cada visita.</p>
       <div class="gerar">
         <select id="canal" aria-label="Canal">
           <option value="instagram">Instagram</option><option value="facebook">Facebook</option><option value="whatsapp">WhatsApp (listas e grupos)</option>
@@ -267,9 +378,9 @@
 
     <section class="cartao">
       <h2>Visitas</h2>
-      <p class="sub">As 200 mais recentes do período. Toque numa visita para ver o caminho que a pessoa fez no book.</p>
+      <p class="sub">As mais recentes, com os filtros. Toque numa visita para ver a jornada: cada página, o tempo nela e o que foi tocado.</p>
       <div class="tabela">
-        <table>
+        <table class="visitas-tab">
           <thead><tr><th>Quando</th><th>De onde</th><th>Aparelho</th><th>Cidade</th><th>Tempo</th><th>Páginas</th><th>WhatsApp</th></tr></thead>
           <tbody id="linhas"></tbody>
         </table>
@@ -288,17 +399,39 @@
   const BOOK = 'https://caucaia2.construtoradpr.com.br/';
   const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
   const $ = (id) => document.getElementById(id);
-  const estado = { dias: 30, dados: null, mostrar: 25 };
+  const estado = { dias: 30, d: null, mostrar: 25, f: { origem: '', campanha: '', aparelho: '', cidade: '' }, semLeitura: false };
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const numero = (n) => Number(n || 0).toLocaleString('pt-BR');
-  const ORIGENS = { instagram: 'Instagram', facebook: 'Facebook', whatsapp: 'WhatsApp', google: 'Google', qr: 'QR code', email: 'E-mail', corretor: 'Corretor', youtube: 'YouTube', tiktok: 'TikTok', direto: 'Direto (link ou digitado)', 'site-dpr': 'Site da DPR', 'outro-site': 'Outro site' };
+  const pct = (a, b) => (b ? Math.round(a / b * 100) : 0);
+  const ORIGENS = { instagram: 'Instagram', facebook: 'Facebook', whatsapp: 'WhatsApp', google: 'Google', qr: 'QR code', email: 'E-mail', corretor: 'Corretor', youtube: 'YouTube', tiktok: 'TikTok', direto: 'Direto (link ou digitado)', 'site-dpr': 'Site da DPR', 'outro-site': 'Outro site', teste: 'Teste' };
   const APARELHOS = { celular: 'Celular', tablet: 'Tablet', computador: 'Computador' };
-  const nomeOrigem = (o) => ORIGENS[o] || (o ? o.charAt(0).toUpperCase() + o.slice(1).replace(/-/g, ' ') : 'Direto');
+  const nomeOrigem = (o) => ORIGENS[o] || (o ? o.charAt(0).toUpperCase() + o.slice(1).replace(/-/g, ' ') : 'Direto (link ou digitado)');
+  const nomeAparelho = (a) => APARELHOS[a] || a || 'Não informado';
+  const cidadeDe = (v) => (v.ci ? v.ci + (v.uf ? ' / ' + v.uf : '') : 'Não informado');
   function tempo(seg) { seg = Math.round(seg || 0); if (seg < 60) return seg + 's'; const m = Math.floor(seg / 60), s = seg % 60; return m < 60 ? m + 'min' + (s ? ' ' + s + 's' : '') : Math.floor(m / 60) + 'h ' + (m % 60) + 'min'; }
+  const duracao = (v) => Math.max(0, (new Date(v.u) - new Date(v.i)) / 1000);
   function quando(iso) { const d = new Date(iso); return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) + ' ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }); }
+  const diaSP = (iso) => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date(iso));
+  const mediana = (l) => { const s = l.filter((x) => x > 0).sort((a, b) => a - b); return s.length ? s[Math.floor(s.length / 2)] : 0; };
   let relogio = null;
   function avisar(t, tipo) { const a = $('aviso'); a.textContent = t; a.className = 'aviso' + (tipo === 'erro' ? ' erro' : ''); a.hidden = false; clearTimeout(relogio); relogio = setTimeout(() => { a.hidden = true; }, 4500); }
   function tela(qual) { $('telaEntrar').hidden = qual !== 'entrar'; $('app').hidden = qual !== 'app'; }
+
+  // nomes legiveis do que foi clicado (o coletor manda tag + classe, ex.: "a.flutua")
+  function nomeAlvo(a) {
+    const s = String(a || '');
+    if (/flutua/.test(s)) return 'Botão do WhatsApp';
+    if (/modo-projeto/.test(s)) return 'Modo projeto';
+    if (/^button\.som/.test(s)) return 'Ligar o som';
+    if (/lupa-ant/.test(s)) return 'Galeria: foto anterior';
+    if (/lupa-prox/.test(s)) return 'Galeria: próxima foto';
+    if (/lupa-fecha/.test(s)) return 'Galeria: fechar';
+    if (/cartao/.test(s)) return 'Cartão dos espaços';
+    if (/^img|foto|figure/.test(s)) return 'Foto';
+    if (/^a/.test(s)) return 'Link';
+    if (/^button/.test(s)) return 'Botão';
+    return 'Área da página';
+  }
 
   async function api(caminho, opcoes) {
     const { data } = await sb.auth.getSession();
@@ -311,10 +444,12 @@
   }
 
   // ---- entrar / sair
-  async function aoEntrar(sessao) {
+  let relogioAgora = null;
+  function aoEntrar(sessao) {
     $('quemEmail').textContent = sessao.user.email || '';
     tela('app');
-    carregar();
+    carregar(); carregarAgora();
+    clearInterval(relogioAgora); relogioAgora = setInterval(() => { if (!document.hidden) carregarAgora(); }, 20000);
   }
   $('formEntrar').addEventListener('submit', async (ev) => {
     ev.preventDefault();
@@ -331,69 +466,245 @@
   async function carregar() {
     $('erroGeral').hidden = true;
     try {
-      estado.dados = await api('/api/resumo?dias=' + estado.dias);
-      desenhar();
+      estado.d = await api('/api/resumo?dias=' + estado.dias);
+      montarFiltros(); desenhar();
     } catch (e) {
       if (e.tratado) return;
       $('erroGeral').textContent = e.message; $('erroGeral').hidden = false;
     }
   }
-  function barras(lista, total, alvo, nomear) {
-    $(alvo).innerHTML = lista.length ? lista.map((x) => { const nome = x.nome === 'não informado' ? 'Não informado' : nomear ? nomear(x.nome) : x.nome; return '<li><b title="' + esc(nome) + '">' + esc(nome) + '</b><em class="num">' + numero(x.n) + ' · ' + (total ? Math.round(x.n / total * 100) : 0) + '%</em><span class="trilho"><i style="width:' + (total ? Math.max(2, x.n / total * 100) : 0) + '%"></i></span></li>'; }).join('') : '<li class="vazio">Sem visitas no período.</li>';
+  async function carregarAgora() {
+    try {
+      const r = await api('/api/agora');
+      const n = r.lendo.length, nomes = {};
+      (estado.d ? estado.d.secoes : []).forEach(([id, nome]) => { nomes[id] = nome; });
+      $('agora').classList.toggle('vazio', n === 0);
+      $('agoraTexto').textContent = n === 0 ? 'Ninguém lendo o book agora' : n === 1 ? '1 pessoa lendo o book agora' : n + ' pessoas lendo o book agora';
+      $('agoraChips').innerHTML = r.lendo.slice(0, 8).map((x) => '<span class="chip">' + esc(nomeAparelho(x.aparelho)) + (x.cidade ? ' · ' + esc(x.cidade) : '') + ' · ' + esc(nomeOrigem(x.origem)) + (x.atual ? ' · lendo ' + esc(nomes[x.atual] || x.atual) : '') + '</span>').join('');
+    } catch (e) { /* o resto do painel segue */ }
   }
+
+  // ---- filtros
+  function opcoes(sel, rotulo, valores, nomear) {
+    const atual = sel.value;
+    sel.innerHTML = '<option value="">' + rotulo + '</option>' + valores.map((v) => '<option value="' + esc(v) + '">' + esc(nomear ? nomear(v) : v) + '</option>').join('');
+    sel.value = valores.indexOf(atual) >= 0 ? atual : '';
+  }
+  const unicos = (l) => [...new Set(l.filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  function montarFiltros() {
+    const vs = estado.d.visitas;
+    opcoes($('fOrigem'), 'Todas as origens', unicos(vs.map((v) => v.o || 'direto')), nomeOrigem);
+    opcoes($('fCampanha'), 'Todas as campanhas', unicos(vs.map((v) => v.c)));
+    opcoes($('fAparelho'), 'Todos os aparelhos', unicos(vs.map((v) => v.ap)), nomeAparelho);
+    opcoes($('fCidade'), 'Todas as cidades', unicos(vs.map((v) => (v.ci ? cidadeDe(v) : ''))));
+  }
+  function aplicar(lista) {
+    const f = estado.f;
+    return lista.filter((v) => (estado.semLeitura || v.s.length > 0)
+      && (!f.origem || (v.o || 'direto') === f.origem) && (!f.campanha || v.c === f.campanha)
+      && (!f.aparelho || v.ap === f.aparelho) && (!f.cidade || cidadeDe(v) === f.cidade));
+  }
+  [['fOrigem', 'origem'], ['fCampanha', 'campanha'], ['fAparelho', 'aparelho'], ['fCidade', 'cidade']].forEach(([id, k]) => $(id).addEventListener('change', () => { estado.f[k] = $(id).value; estado.mostrar = 25; desenhar(); }));
+  $('fSemLeitura').addEventListener('change', () => { estado.semLeitura = $('fSemLeitura').checked; desenhar(); });
+  $('btLimpar').addEventListener('click', () => { estado.f = { origem: '', campanha: '', aparelho: '', cidade: '' }; ['fOrigem', 'fCampanha', 'fAparelho', 'fCidade'].forEach((id) => { $(id).value = ''; }); $('fSemLeitura').checked = false; estado.semLeitura = false; desenhar(); });
+
+  // ---- calculos
+  function metricas(vs) {
+    const total = vs.length, porPessoa = {};
+    vs.forEach((v) => { porPessoa[v.v] = (porPessoa[v.v] || 0) + 1; });
+    const wa = vs.filter((v) => v.w).length;
+    return { total, pessoas: Object.keys(porPessoa).length, voltaram: Object.values(porPessoa).filter((n) => n > 1).length, wa, conv: total ? wa / total * 100 : 0, tempo: mediana(vs.map(duracao)), fim: pct(vs.filter((v) => v.s.includes('p20')).length, total) };
+  }
+  function delta(el, atual, anterior, unidadePct) {
+    const e = $(el);
+    if (!anterior && !atual) { e.textContent = ''; return; }
+    if (!anterior) { e.textContent = 'novo no período'; e.className = 'delta sobe'; return; }
+    const dif = unidadePct ? Math.round(atual - anterior) : Math.round((atual - anterior) / anterior * 100);
+    e.textContent = (dif > 0 ? '+' : dif < 0 ? '−' : '') + Math.abs(dif) + (unidadePct ? (Math.abs(dif) === 1 ? ' ponto' : ' pontos') : '%') + ' que os ' + estado.dias + ' dias anteriores';
+    e.className = 'delta ' + (dif > 0 ? 'sobe' : dif < 0 ? 'desce' : 'igual');
+  }
+  function ordemDe(id) { return estado.d.secoes.findIndex((s) => s[0] === id); }
+  function ultimaPagina(v) { let m = -1; v.s.forEach((id) => { const i = ordemDe(id); if (i > m) m = i; }); return m >= 0 ? estado.d.secoes[m][0] : null; }
+
+  // nota de interesse por pessoa (visitante anonimo), de 0 a 100
+  function leadsQuentes(vs) {
+    const grupos = {};
+    vs.forEach((v) => { (grupos[v.v] = grupos[v.v] || []).push(v); });
+    return Object.values(grupos).map((lista) => {
+      const paginas = new Set(); let seg = 0, wa = false;
+      lista.forEach((v) => { v.s.forEach((p) => paginas.add(p)); seg += duracao(v); if (v.w) wa = true; });
+      const motivos = []; let nota = 0;
+      nota += Math.min(30, paginas.size * 2); if (paginas.size >= 12) motivos.push('leu ' + paginas.size + ' de 16 páginas');
+      if (lista.length > 1) { nota += Math.min(25, (lista.length - 1) * 12); motivos.push('voltou ' + (lista.length - 1) + (lista.length > 2 ? ' vezes' : ' vez')); }
+      if (paginas.has('p18')) { nota += 10; motivos.push('viu Financiamento'); }
+      if (paginas.has('p19')) { nota += 8; motivos.push('viu Ficha técnica'); }
+      if (paginas.has('p13')) { nota += 5; motivos.push('viu As casas'); }
+      if (seg >= 180) { nota += Math.min(12, Math.floor(seg / 60) * 2); motivos.push(tempo(seg) + ' no book'); }
+      if (wa) { nota += 10; motivos.push('chamou no WhatsApp'); }
+      lista.sort((a, b) => b.i.localeCompare(a.i));
+      return { nota: Math.min(100, nota), motivos, ultima: lista[0], visitas: lista.length, paginas: paginas.size, wa };
+    }).filter((x) => x.nota >= 30).sort((a, b) => b.nota - a.nota || b.ultima.i.localeCompare(a.ultima.i)).slice(0, 10);
+  }
+
+  // ---- desenho
+  function linhasBarras(alvo, lista, total, vazio) {
+    $(alvo).innerHTML = lista.length ? lista.map((x) => '<li><b title="' + esc(x.nome) + '">' + esc(x.nome) + '</b><em class="num">' + esc(x.extra || (numero(x.n) + ' · ' + pct(x.n, total) + '%')) + '</em><span class="trilho"><i style="width:' + Math.max(2, pct(x.n, x.max || total)) + '%"></i></span></li>').join('') : '<li class="vazio">' + (vazio || 'Nada no período.') + '</li>';
+  }
+  function contar(vs, chave) { const m = {}; vs.forEach((v) => { const k = chave(v); (m[k] = m[k] || []).push(v); }); return Object.entries(m).map(([nome, l]) => ({ nome, l })).sort((a, b) => b.l.length - a.l.length); }
+
   function desenhar() {
-    const d = estado.dados, r = d.resumo, total = r.total;
-    $('kWa').textContent = numero(r.whatsapp);
-    $('kConv').textContent = String(r.conversao).replace('.', ',') + '% das visitas';
-    $('kVisitas').textContent = numero(total);
-    $('kUnicos').textContent = numero(r.unicos);
-    $('kVoltaram').textContent = numero(r.voltaram) + (r.voltaram === 1 ? ' voltou' : ' voltaram') + ' outra vez';
-    $('kTempo').textContent = tempo(r.tempoMediano);
-    const fim = r.funil.length ? r.funil[r.funil.length - 1].n : 0;
-    $('kFim').textContent = (total ? Math.round(fim / total * 100) : 0) + '%';
-    // dias: todos os dias do periodo, mesmo os sem visita
-    const mapa = {}; r.porDia.forEach((x) => { mapa[x.dia] = x; });
-    const dias = []; const hoje = new Date();
-    for (let i = estado.dias - 1; i >= 0; i--) { const t = new Date(hoje.getTime() - i * 86400e3); const k = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(t); dias.push(mapa[k] || { dia: k, visitas: 0, whatsapp: 0 }); }
-    const max = Math.max(1, ...dias.map((x) => x.visitas));
-    const passo = Math.ceil(dias.length / 8);
-    $('dias').innerHTML = dias.map((x, i) => '<div class="dia" title="' + x.dia.split('-').reverse().join('/') + ': ' + x.visitas + ' visitas, ' + x.whatsapp + ' no WhatsApp"><div class="barra" style="height:' + (x.visitas / max * 100) + '%"><i style="height:' + (x.visitas ? x.whatsapp / x.visitas * 100 : 0) + '%"></i></div>' + (i % passo === 0 || i === dias.length - 1 ? '<small>' + x.dia.slice(8) + '/' + x.dia.slice(5, 7) + '</small>' : '') + '</div>').join('');
-    barras(r.origens, total, 'origens', nomeOrigem); barras(r.aparelhos, total, 'aparelhos', (a) => APARELHOS[a] || a); barras(r.cidades, total, 'cidades');
-    $('funil').innerHTML = r.funil.map((s, i) => '<li><span class="pg">' + (s.id === 'obra' ? 'obra' : s.id.slice(1)) + '</span><span class="nome">' + esc(s.nome) + '</span><span class="trilho"><i style="width:' + (total ? s.n / total * 100 : 0) + '%"></i></span><span class="val num"><b>' + numero(s.n) + '</b> · ' + (total ? Math.round(s.n / total * 100) : 0) + '%</span></li>').join('');
+    const d = estado.d; if (!d) return;
+    const vs = aplicar(d.visitas), ant = aplicar(d.anteriores);
+    const m = metricas(vs), ma = metricas(ant);
+    $('kWa').textContent = numero(m.wa); $('kConv').textContent = String(Math.round(m.conv * 10) / 10).replace('.', ',') + '% das visitas';
+    $('kVisitas').textContent = numero(m.total); $('kUnicos').textContent = numero(m.pessoas);
+    $('kVoltaram').textContent = numero(m.voltaram) + (m.voltaram === 1 ? ' voltou' : ' voltaram') + ' outra vez';
+    $('kTempo').textContent = tempo(m.tempo); $('kFim').textContent = m.fim + '%';
+    delta('dWa', m.wa, ma.wa); delta('dVisitas', m.total, ma.total); delta('dUnicos', m.pessoas, ma.pessoas); delta('dTempo', m.tempo, ma.tempo); delta('dFim', m.fim, ma.fim, true);
+
+    // visitas por dia
+    const porDia = {}; vs.forEach((v) => { const k = diaSP(v.i); porDia[k] = porDia[k] || { n: 0, w: 0 }; porDia[k].n++; if (v.w) porDia[k].w++; });
+    const dias = []; const hoje = new Date(d.agora);
+    for (let i = estado.dias - 1; i >= 0; i--) { const k = diaSP(new Date(hoje.getTime() - i * 86400e3)); dias.push(Object.assign({ k }, porDia[k] || { n: 0, w: 0 })); }
+    const max = Math.max(1, ...dias.map((x) => x.n)), passo = Math.ceil(dias.length / 8);
+    $('dias').innerHTML = dias.map((x, i) => '<div class="dia" title="' + x.k.split('-').reverse().join('/') + ': ' + x.n + ' visitas, ' + x.w + ' no WhatsApp"><div class="barra" style="height:' + (x.n / max * 100) + '%"><i style="height:' + (x.n ? x.w / x.n * 100 : 0) + '%"></i></div>' + (i % passo === 0 ? '<small>' + x.k.slice(8) + '/' + x.k.slice(5, 7) + '</small>' : '') + '</div>').join('');
+
+    // meta (sem filtros: o mes inteiro)
+    const meta = d.meta || { valor: 0, whatsappMes: 0 };
+    $('metaNum').innerHTML = numero(meta.whatsappMes) + (meta.valor ? ' <small>de ' + numero(meta.valor) + '</small>' : '');
+    $('metaTrilho').querySelector('i').style.width = (meta.valor ? Math.min(100, pct(meta.whatsappMes, meta.valor)) : 0) + '%';
+    $('metaTrilho').classList.toggle('batida', meta.valor > 0 && meta.whatsappMes >= meta.valor);
+    if (meta.valor) {
+      const diaMes = Number(new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', day: '2-digit' }).format(new Date(d.agora)));
+      const fimMes = new Date(new Date(d.agora).getFullYear(), new Date(d.agora).getMonth() + 1, 0).getDate();
+      const ritmo = Math.round(meta.whatsappMes / diaMes * fimMes);
+      $('metaTexto').textContent = meta.whatsappMes >= meta.valor ? 'Meta batida.' : pct(meta.whatsappMes, meta.valor) + '% da meta. No ritmo atual, o mês fecha com cerca de ' + ritmo + ' contatos.';
+    } else $('metaTexto').textContent = 'Defina a meta de contatos do mês.';
+    if (document.activeElement !== $('metaValor')) $('metaValor').value = meta.valor || '';
+
+    // leads quentes
     const nomes = {}; d.secoes.forEach(([id, nome]) => { nomes[id] = nome; });
-    $('maisVisitas').hidden = d.visitas.length <= estado.mostrar;
-    $('maisVisitas').textContent = 'Mostrar mais (' + Math.min(25, d.visitas.length - estado.mostrar) + ' de ' + (d.visitas.length - estado.mostrar) + ' restantes)';
-    $('linhas').innerHTML = d.visitas.length ? d.visitas.slice(0, estado.mostrar).map((v, i) => {
-      const seg = (new Date(v.ultima_em) - new Date(v.inicio)) / 1000;
-      const n = v.secoes.length, pct = Math.round(n / d.secoes.length * 100);
-      return '<tr class="visita" data-i="' + i + '" tabindex="0" aria-expanded="false"><td class="num">' + quando(v.inicio) + (v.novo ? '' : ' <span class="selo volta">voltou</span>') + '</td><td>' + esc(nomeOrigem(v.origem)) + (v.campanha ? '<br><small style="color:var(--text-light)">' + esc(v.campanha) + '</small>' : '') + '</td><td>' + esc(APARELHOS[v.aparelho] || v.aparelho || '') + '</td><td>' + esc(v.cidade ? v.cidade + (v.estado ? ' / ' + v.estado : '') : '—') + '</td><td class="num">' + tempo(seg) + '</td><td><span class="pags"><span class="mini"><i style="width:' + pct + '%"></i></span><span class="num">' + n + ' de ' + d.secoes.length + '</span></span></td><td>' + (v.whatsapp ? '<span class="selo wa">chamou</span>' : '<span class="selo nao">não</span>') + '</td></tr>'
-        + '<tr data-caminho="' + i + '" hidden><td colspan="7"><div class="caminho">' + (n ? v.secoes.map((s, j) => '<span' + (j === n - 1 ? ' class="ult"' : '') + '>' + esc(nomes[s] || s) + '</span>').join('') : '<span>Saiu antes de ver a primeira página inteira</span>') + '</div></td></tr>';
-    }).join('') : '<tr><td colspan="7" class="vazio">Nenhuma visita no período.</td></tr>';
+    const q = leadsQuentes(vs);
+    $('quentes').innerHTML = q.length ? q.map((x) => '<li class="quente"><span class="nota' + (x.nota < 50 ? ' morna' : '') + ' num">' + x.nota + '</span><div><b>' + esc(nomeAparelho(x.ultima.ap)) + ' · ' + esc(cidadeDe(x.ultima)) + '</b><div class="quem-q">' + x.visitas + (x.visitas > 1 ? ' visitas' : ' visita') + ' · última ' + quando(x.ultima.i) + ' · veio por ' + esc(nomeOrigem(x.ultima.o)) + '</div><div class="motivos">' + x.motivos.map((t) => '<span>' + esc(t) + '</span>').join('') + '</div></div><button class="bt pequeno" type="button" data-ver="' + esc(x.ultima.id) + '">Ver jornada</button></li>').join('') : '<li class="vazio">Ninguém com interesse alto no período ainda.</li>';
+
+    // funil, tempo por pagina e onde desistem
+    const total = vs.length;
+    const linhas = d.secoes.map(([id, nome], i) => {
+      const chegaram = vs.filter((v) => v.s.includes(id));
+      const tempos = vs.map((v) => (v.t && v.t[id]) || 0).filter((ms) => ms > 0);
+      const media = tempos.length ? tempos.reduce((a, b) => a + b, 0) / tempos.length / 1000 : 0;
+      const pararam = vs.filter((v) => ultimaPagina(v) === id).length;
+      return { id, nome, i, n: chegaram.length, media, pararam };
+    });
+    let pior = null; linhas.forEach((l) => { if (l.id !== 'p20' && l.pararam > 0 && (!pior || l.pararam > pior.pararam)) pior = l; });
+    $('destaqueSaida').hidden = !pior;
+    if (pior) $('destaqueSaida').textContent = 'A página onde mais gente desiste é "' + pior.nome + '": ' + pior.pararam + (pior.pararam === 1 ? ' visita parou' : ' visitas pararam') + ' ali (' + pct(pior.pararam, total) + '%).';
+    $('funil').innerHTML = linhas.map((l) => '<tr' + (pior && l.id === pior.id ? ' class="pior"' : '') + '><td class="pg">' + (l.id === 'obra' ? 'obra' : l.id.slice(1)) + '</td><td class="nome">' + esc(l.nome) + '</td><td class="esconde-cel" style="width:34%"><div class="trilho"><i style="width:' + pct(l.n, total) + '%"></i></div></td><td class="dir num"><b>' + numero(l.n) + '</b> · ' + pct(l.n, total) + '%</td><td class="dir num">' + (l.media ? tempo(l.media) : '—') + '</td><td class="dir num saiu">' + (l.pararam ? numero(l.pararam) : '—') + '</td></tr>').join('');
+
+    // qualidade por origem e por aparelho
+    const linhaGrupo = (g, nome, colunas) => { const l = g.l, w = l.filter((v) => v.w).length; return '<tr><td><b>' + esc(nome) + '</b></td><td class="dir num">' + numero(l.length) + '</td>' + (colunas === 4 ? '' : '<td class="dir num">' + pct(l.filter((v) => v.s.includes('p20')).length, l.length) + '%</td>') + '<td class="dir num">' + numero(w) + ' · ' + pct(w, l.length) + '%</td><td class="dir num">' + tempo(mediana(l.map(duracao))) + '</td></tr>'; };
+    const go = contar(vs, (v) => v.o || 'direto');
+    $('porOrigem').innerHTML = go.length ? go.map((g) => linhaGrupo(g, nomeOrigem(g.nome), 5)).join('') : '<tr><td colspan="5" class="vazio">Sem visitas.</td></tr>';
+    const ga = contar(vs, (v) => v.ap || '');
+    $('porAparelho').innerHTML = ga.length ? ga.map((g) => linhaGrupo(g, nomeAparelho(g.nome), 4)).join('') : '<tr><td colspan="4" class="vazio">Sem visitas.</td></tr>';
+
+    // o que mais clicam (so as visitas do filtro)
+    const ids = new Set(vs.map((v) => v.id)), soma = {};
+    d.cliques.forEach((c) => { if (!ids.has(c.s)) return; const k = nomeAlvo(c.a) + (/flutua/.test(c.a) ? '' : ' · ' + (nomes[c.p] || c.p || '')); soma[k] = (soma[k] || 0) + c.n; });
+    const cl = Object.entries(soma).map(([nome, n]) => ({ nome, n })).sort((a, b) => b.n - a.n).slice(0, 12);
+    const maxCl = cl.length ? cl[0].n : 1;
+    linhasBarras('cliques', cl.map((x) => Object.assign(x, { max: maxCl, extra: numero(x.n) + (x.n === 1 ? ' toque' : ' toques') })), 0, 'Nenhum toque registrado no período.');
+
+    // dia x hora
+    const fmt = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Sao_Paulo', weekday: 'short', hour: 'numeric', hourCycle: 'h23' });
+    const DS = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 }, grade = Array.from({ length: 7 }, () => Array(24).fill(0));
+    vs.forEach((v) => { const p = fmt.formatToParts(new Date(v.i)); const w = DS[p.find((x) => x.type === 'weekday').value]; const h = Number(p.find((x) => x.type === 'hour').value) % 24; grade[w][h]++; });
+    const maxG = Math.max(1, ...grade.flat()), NOMES = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+    $('grade').innerHTML = '<table><thead><tr><th></th>' + Array.from({ length: 24 }, (_, h) => '<th>' + (h % 3 === 0 ? h + 'h' : '') + '</th>').join('') + '</tr></thead><tbody>' + grade.map((linha, w) => '<tr><th class="dia-s">' + NOMES[w] + '</th>' + linha.map((n, h) => '<td class="c" title="' + NOMES[w] + ' ' + h + 'h: ' + n + ' visitas" style="' + (n ? 'background:rgba(21,22,26,' + (0.12 + 0.88 * n / maxG).toFixed(2) + ')' : '') + '"></td>').join('') + '</tr>').join('') + '</tbody></table>';
+
+    // voltaram
+    const grupos = contar(vs, (v) => v.v).filter((g) => g.l.length > 1).slice(0, 12);
+    const maxV = grupos.length ? grupos[0].l.length : 1;
+    linhasBarras('voltaram', grupos.map((g) => { const l = g.l.slice().sort((a, b) => b.i.localeCompare(a.i)); const pg = new Set(); l.forEach((v) => v.s.forEach((p) => pg.add(p))); return { nome: nomeAparelho(l[0].ap) + ' · ' + cidadeDe(l[0]) + ' · ' + nomeOrigem(l[0].o) + (l.some((v) => v.w) ? ' · chamou' : ''), n: l.length, max: maxV, extra: l.length + ' visitas · leu ' + pg.size + '/16 · última ' + quando(l[0].i) }; }), 0, 'Ninguém voltou no período ainda.');
+
+    // cidades
+    const gc = contar(vs, cidadeDe).slice(0, 12);
+    linhasBarras('cidades', gc.map((g) => ({ nome: g.nome, n: g.l.length })), total, 'Sem visitas no período.');
+
+    // visitas
+    $('maisVisitas').hidden = vs.length <= estado.mostrar;
+    $('maisVisitas').textContent = 'Mostrar mais (' + (vs.length - estado.mostrar) + ' restantes)';
+    const primeiras = {}; d.visitas.concat(d.anteriores).forEach((v) => { if (!primeiras[v.v] || v.i < primeiras[v.v]) primeiras[v.v] = v.i; });
+    $('linhas').innerHTML = vs.length ? vs.slice(0, estado.mostrar).map((v) => {
+      const n = v.s.length;
+      return '<tr class="visita" data-id="' + esc(v.id) + '" tabindex="0" aria-expanded="false"><td class="num">' + quando(v.i) + (primeiras[v.v] < v.i ? ' <span class="selo volta">voltou</span>' : '') + '</td><td>' + esc(nomeOrigem(v.o)) + (v.c ? '<br><small style="color:var(--text-light)">' + esc(v.c) + '</small>' : '') + '</td><td>' + esc(nomeAparelho(v.ap)) + '</td><td>' + esc(cidadeDe(v)) + '</td><td class="num">' + tempo(duracao(v)) + '</td><td><span class="pags"><span class="mini"><i style="width:' + pct(n, 16) + '%"></i></span><span class="num">' + n + ' de 16</span></span></td><td>' + (v.w ? '<span class="selo wa">chamou</span>' : '<span class="selo nao">não</span>') + '</td></tr><tr data-jornada="' + esc(v.id) + '" hidden><td colspan="7"></td></tr>';
+    }).join('') : '<tr><td colspan="7" class="vazio">Nenhuma visita com esses filtros.</td></tr>';
   }
-  function alternarCaminho(tr) {
-    const i = tr.dataset.i, linha = document.querySelector('[data-caminho="' + i + '"]');
-    linha.hidden = !linha.hidden; tr.setAttribute('aria-expanded', String(!linha.hidden));
+
+  // ---- jornada de uma visita
+  async function abrirJornada(id, rolar) {
+    let tr = document.querySelector('tr.visita[data-id="' + CSS.escape(id) + '"]');
+    if (!tr) {   // visita fora das linhas mostradas (veio dos leads quentes): mostra todas
+      estado.mostrar = 100000; desenhar();
+      tr = document.querySelector('tr.visita[data-id="' + CSS.escape(id) + '"]');
+      if (!tr) return;
+    }
+    const linha = document.querySelector('[data-jornada="' + CSS.escape(id) + '"]');
+    if (!linha.hidden && !rolar) { linha.hidden = true; tr.setAttribute('aria-expanded', 'false'); return; }
+    linha.hidden = false; tr.setAttribute('aria-expanded', 'true');
+    if (rolar) tr.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const cel = linha.querySelector('td');
+    cel.innerHTML = '<p class="vazio">Carregando a jornada...</p>';
+    try {
+      const r = await api('/api/jornada?id=' + encodeURIComponent(id));
+      const nomes = {}; estado.d.secoes.forEach(([sid, nome]) => { nomes[sid] = nome; });
+      const ini = new Date(r.visita.inicio).getTime();
+      const mmss = (iso) => { const s = Math.max(0, Math.round((new Date(iso).getTime() - ini) / 1000)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
+      const itens = []; let ant = '';
+      r.eventos.forEach((e) => {
+        const t = e.tipo === 'secao' ? 'Viu "' + (nomes[e.secao] || e.secao) + '"' : e.tipo === 'whatsapp' ? 'Chamou no WhatsApp' : 'Tocou em ' + nomeAlvo(e.alvo) + (e.secao && !/flutua/.test(e.alvo || '') ? ' (' + (nomes[e.secao] || e.secao) + ')' : '');
+        if (t === ant) return; ant = t;
+        itens.push('<li' + (e.tipo === 'whatsapp' ? ' class="wa"' : '') + '><time>' + mmss(e.em) + '</time><span>' + esc(t) + '</span></li>');
+      });
+      const tempos = Object.entries(r.visita.tempos || {}).sort((a, b) => ordemDe(a[0]) - ordemDe(b[0]));
+      const maxT = Math.max(1, ...tempos.map((x) => x[1]));
+      cel.innerHTML = '<div class="jornada"><div><h3>Linha do tempo</h3><ol class="linha-tempo"><li><time>0:00</time><span>Abriu o book (' + esc(nomeOrigem(r.visita.origem)) + ')</span></li>' + itens.join('') + '</ol></div><div><h3>Tempo em cada página</h3>' + (tempos.length ? '<ul class="tempos-pag">' + tempos.map(([sid, ms]) => '<li><span>' + esc(nomes[sid] || sid) + '</span><span class="num" style="text-align:right">' + tempo(ms / 1000) + '</span><span class="trilho"><i style="width:' + pct(ms, maxT) + '%"></i></span></li>').join('') + '</ul>' : '<p class="vazio">Sem medição de tempo nesta visita.</p>') + '</div></div>';
+    } catch (e) {
+      if (!e.tratado) cel.innerHTML = '<p class="vazio">' + esc(e.message) + '</p>';
+    }
   }
-  $('linhas').addEventListener('click', (ev) => { const tr = ev.target.closest('tr.visita'); if (tr) alternarCaminho(tr); });
-  $('linhas').addEventListener('keydown', (ev) => { if ((ev.key === 'Enter' || ev.key === ' ') && ev.target.matches('tr.visita')) { ev.preventDefault(); alternarCaminho(ev.target); } });
+  $('linhas').addEventListener('click', (ev) => { const tr = ev.target.closest('tr.visita'); if (tr) abrirJornada(tr.dataset.id); });
+  $('linhas').addEventListener('keydown', (ev) => { if ((ev.key === 'Enter' || ev.key === ' ') && ev.target.matches('tr.visita')) { ev.preventDefault(); abrirJornada(ev.target.dataset.id); } });
+  $('quentes').addEventListener('click', (ev) => { const b = ev.target.closest('[data-ver]'); if (b) abrirJornada(b.dataset.ver, true); });
+  $('maisVisitas').addEventListener('click', () => { estado.mostrar += 25; desenhar(); });
   document.querySelectorAll('[data-dias]').forEach((b) => b.addEventListener('click', () => {
     document.querySelectorAll('[data-dias]').forEach((x) => x.classList.toggle('ativo', x === b));
     estado.dias = Number(b.dataset.dias); estado.mostrar = 25; carregar();
   }));
-  $('maisVisitas').addEventListener('click', () => { estado.mostrar += 25; desenhar(); });
 
-  // ---- mapa: a aba abre antes do pedido (senao o navegador bloqueia o pop-up)
-  document.querySelectorAll('[data-mapa]').forEach((b) => b.addEventListener('click', async () => {
-    const aba = window.open('', '_blank');
-    try {
-      const r = await api('/api/ticket', { method: 'POST' });
-      const h = new URLSearchParams({ mapaleads: r.bilhete, tipo: b.dataset.mapa, aparelho: b.dataset.aparelho, dias: String(estado.dias) });
-      if (aba) aba.location = BOOK + '#' + h.toString(); else location.href = BOOK + '#' + h.toString();
-    } catch (e) {
-      if (aba) aba.close();
-      if (!e.tratado) avisar(e.message, 'erro');
-    }
-  }));
+  // ---- meta
+  $('btMeta').addEventListener('click', async () => {
+    const v = Number($('metaValor').value);
+    if (!Number.isFinite(v) || v < 0) { avisar('Digite um número para a meta.', 'erro'); return; }
+    $('btMeta').disabled = true;
+    try { await api('/api/meta', { method: 'POST', body: JSON.stringify({ valor: v }) }); avisar('Meta salva.'); estado.d.meta.valor = Math.round(v); desenhar(); }
+    catch (e) { if (!e.tratado) avisar(e.message, 'erro'); }
+    $('btMeta').disabled = false;
+  });
+
+  // ---- exportar (CSV que o Excel abre: ponto e virgula e acentos)
+  $('btExportar').addEventListener('click', () => {
+    if (!estado.d) return;
+    const nomes = {}; estado.d.secoes.forEach(([id, nome]) => { nomes[id] = nome; });
+    const linhas = [['Data', 'Hora', 'Origem', 'Campanha', 'Aparelho', 'Cidade', 'UF', 'Tempo (s)', 'Páginas vistas', 'Última página', 'Chamou no WhatsApp']];
+    aplicar(estado.d.visitas).forEach((v) => { const d = new Date(v.i); const ult = ultimaPagina(v); linhas.push([d.toLocaleDateString('pt-BR'), d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }), nomeOrigem(v.o), v.c || '', nomeAparelho(v.ap), v.ci || '', v.uf || '', Math.round(duracao(v)), v.s.length, ult ? nomes[ult] : '', v.w ? 'sim' : 'não']); });
+    const csv = '﻿' + linhas.map((l) => l.map((c) => '"' + String(c).replace(/"/g, '""') + '"').join(';')).join('\r\n');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+    a.download = 'leads-book-caucaia2-' + new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date()) + '.csv';
+    document.body.appendChild(a); a.click(); a.remove();
+    avisar('Planilha baixada: ' + (linhas.length - 1) + ' visitas.');
+  });
 
   // ---- link marcado
   function linkMarcado() { $('linkMarcado').textContent = BOOK + '?origem=' + $('canal').value; }
