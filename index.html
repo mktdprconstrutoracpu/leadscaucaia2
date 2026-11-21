@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Leads do Book · Villagio Caucaia II</title>
+<!--
+  Painel do rastreio do book digital do Villagio Caucaia II (caucaia2.construtoradpr.com.br).
+  So a equipe da lista AUTORIZADOS (variavel na Vercel) entra, com o login do Supabase da DPR.
+  Dados: api/resumo.js (visitas do periodo) e api/ticket.js + t.js (mapa de calor por cima do book).
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<style>
+  :root {
+    --accent: #e10600; --accent-escuro: #b80500; --accent-leve: rgba(225, 6, 0, .08);
+    --grafite: #15161a; --grafite-2: #1f2026;
+    --primary: #15161a; --text: #2a2c31; --text-light: #6b6f78; --text-fraco: #9a9ea6;
+    --border: #e7e3dc; --linha: #efebe5; --fundo: #f5f2ed; --white: #fff;
+    --verde: #1f7a35; --verde-leve: rgba(31, 122, 53, .1);
+    --ambar: #a86100; --ambar-leve: rgba(168, 97, 0, .11);
+    --display: 'Archivo', 'Inter', sans-serif;
+    --sombra: 0 1px 2px rgba(18, 19, 22, .05), 0 8px 24px rgba(18, 19, 22, .05);
+    --raio: 16px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body { font-family: 'Inter', sans-serif; font-size: 14px; color: var(--text); background: var(--fundo); -webkit-font-smoothing: antialiased; min-height: 100vh; }
+  [hidden] { display: none !important; }
+  button, input, select { font: inherit; color: inherit; }
+  h1, h2, h3 { font-family: var(--display); color: var(--primary); letter-spacing: -.02em; margin: 0; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .num { font-variant-numeric: tabular-nums; }
+  .bt { appearance: none; border: 1px solid var(--border); background: var(--white); color: var(--primary); border-radius: 12px; min-height: 40px; padding: 0 16px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px; white-space: nowrap; }
+  .bt:hover { border-color: var(--primary); }
+  .bt.cheio { background: var(--accent); border-color: var(--accent); color: var(--white); box-shadow: 0 10px 24px rgba(225, 6, 0, .2); }
+  .bt.cheio:hover { background: var(--accent-escuro); }
+  .bt:disabled { opacity: .45; cursor: default; }
+
+  /* entrada */
+  .entrada { min-height: 100vh; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); background: var(--grafite); }
+  .entrada-lado { position: relative; padding: 56px 7vw; display: flex; flex-direction: column; justify-content: space-between; gap: 40px; color: var(--white); overflow: hidden; }
+  .entrada-lado::before { content: ''; position: absolute; inset: 0; background: radial-gradient(560px 360px at 100% 100%, rgba(225, 6, 0, .32), transparent 70%); }
+  .entrada-lado > * { position: relative; }
+  .entrada-lado img { width: 130px; }
+  .entrada-titulo { font-family: var(--display); font-size: clamp(36px, 4.2vw, 60px); font-weight: 900; line-height: 1.02; letter-spacing: -.035em; color: var(--white); margin: 0 0 16px; }
+  .entrada-titulo span { color: var(--accent); }
+  .entrada-texto { color: rgba(255, 255, 255, .66); font-size: 15px; line-height: 1.6; max-width: 42ch; margin: 0; }
+  .entrada-form { background: var(--fundo); display: grid; place-items: center; padding: 32px 24px; }
+  .cartao-entrar { width: min(400px, 100%); display: grid; gap: 16px; }
+  .cartao-entrar h1 { font-size: 28px; }
+  .cartao-entrar p { margin: 0; color: var(--text-light); line-height: 1.5; }
+  .campo { display: grid; gap: 6px; }
+  .campo label { font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--text-light); }
+  .campo input { width: 100%; min-height: 48px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--white); outline: none; font-size: 16px; }
+  .campo input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-leve); }
+  .recado { min-height: 18px; font-size: 13px; color: var(--accent); }
+
+  /* topo */
+  .topo { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 16px; padding: 12px clamp(16px, 3vw, 40px); background: var(--grafite); color: var(--white); }
+  .topo img { width: 74px; }
+  .topo .titulo { display: grid; line-height: 1.2; min-width: 0; }
+  .topo .titulo b { font-family: var(--display); font-size: 16px; }
+  .topo .titulo small { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: rgba(255, 255, 255, .5); font-weight: 600; }
+  .topo .quem { margin-left: auto; font-size: 12.5px; color: rgba(255, 255, 255, .6); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+  .topo .bt { background: transparent; border-color: rgba(255, 255, 255, .2); color: var(--white); min-height: 34px; }
+  .topo .bt:hover { background: var(--white); color: var(--primary); }
+
+  .conteudo { max-width: 1240px; margin: 0 auto; padding: 28px clamp(16px, 3vw, 40px) 60px; display: grid; gap: 20px; }
+  .cabeca { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  .cabeca h1 { font-size: 30px; }
+  .cabeca p { margin: 4px 0 0; color: var(--text-light); max-width: 60ch; line-height: 1.5; }
+  .periodo { display: inline-flex; background: var(--white); border: 1px solid var(--border); border-radius: 12px; padding: 3px; gap: 2px; }
+  .periodo button { appearance: none; border: 0; background: none; border-radius: 9px; padding: 7px 12px; font-weight: 600; color: var(--text-light); cursor: pointer; }
+  .periodo button.ativo { background: var(--primary); color: var(--white); }
+  .aviso-erro { padding: 14px 16px; border-radius: 12px; background: var(--accent-leve); color: var(--accent-escuro); font-weight: 600; }
+
+  .cartao { background: var(--white); border-radius: var(--raio); box-shadow: var(--sombra); padding: 20px 22px; min-width: 0; }
+  .cartao h2 { font-size: 17px; display: flex; align-items: center; gap: 10px; }
+  .cartao h2::before { content: ''; width: 3px; height: 17px; border-radius: 2px; background: var(--accent); }
+  .cartao .sub { margin: 6px 0 0; color: var(--text-light); font-size: 13px; line-height: 1.5; }
+
+  .kpis { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
+  .kpi { background: var(--white); border-radius: var(--raio); box-shadow: var(--sombra); padding: 16px 18px; display: grid; gap: 4px; }
+  .kpi span { font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--text-light); }
+  .kpi b { font-family: var(--display); font-size: 30px; color: var(--primary); letter-spacing: -.02em; line-height: 1.1; }
+  .kpi small { color: var(--text-light); font-size: 12.5px; }
+  .kpi.destaque { background: var(--grafite); }
+  .kpi.destaque span, .kpi.destaque small { color: rgba(255, 255, 255, .6); }
+  .kpi.destaque b { color: var(--white); }
+
+  /* visitas por dia */
+  .dias { display: flex; align-items: flex-end; gap: 3px; height: 150px; margin-top: 18px; padding-bottom: 22px; position: relative; overflow-x: auto; }
+  .dia { flex: 1 1 0; min-width: 4px; display: flex; flex-direction: column; justify-content: flex-end; align-items: stretch; height: 100%; position: relative; }
+  .dia .barra { background: #d9d4cc; border-radius: 4px 4px 0 0; position: relative; min-height: 2px; }
+  .dia .barra i { position: absolute; left: 0; right: 0; bottom: 0; background: var(--accent); border-radius: 4px 4px 0 0; }
+  .dia small { position: absolute; bottom: -20px; left: 50%; transform: translateX(-50%); font-size: 10.5px; color: var(--text-fraco); white-space: nowrap; }
+  .legenda { display: flex; gap: 16px; margin-top: 10px; font-size: 12.5px; color: var(--text-light); }
+  .legenda span { display: inline-flex; align-items: center; gap: 6px; }
+  .legenda i { width: 10px; height: 10px; border-radius: 3px; background: #d9d4cc; }
+  .legenda i.wa { background: var(--accent); }
+
+  .tres { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
+  .lista-barras { list-style: none; margin: 14px 0 0; padding: 0; display: grid; gap: 10px; }
+  .lista-barras li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 10px; font-size: 13.5px; }
+  .lista-barras li b { font-weight: 600; color: var(--primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lista-barras li em { font-style: normal; color: var(--text-light); }
+  .lista-barras li .trilho { grid-column: 1 / -1; height: 6px; border-radius: 3px; background: var(--linha); overflow: hidden; }
+  .lista-barras li .trilho i { display: block; height: 100%; background: var(--primary); border-radius: 3px; }
+  .vazio { color: var(--text-fraco); font-size: 13.5px; margin: 14px 0 0; }
+
+  /* funil */
+  .funil { list-style: none; margin: 16px 0 0; padding: 0; display: grid; gap: 7px; }
+  .funil li { display: grid; grid-template-columns: 34px minmax(140px, 220px) minmax(0, 1fr) 92px; align-items: center; gap: 12px; font-size: 13.5px; }
+  .funil .pg { font-family: var(--display); font-weight: 800; color: var(--text-fraco); font-size: 12px; }
+  .funil .nome { font-weight: 600; color: var(--primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .funil .trilho { height: 14px; border-radius: 4px; background: var(--linha); overflow: hidden; }
+  .funil .trilho i { display: block; height: 100%; background: linear-gradient(90deg, var(--grafite), #3a3c44); border-radius: 4px; }
+  .funil li:last-child .trilho i { background: var(--accent); }
+  .funil .val { text-align: right; color: var(--text-light); }
+  .funil .val b { color: var(--primary); }
+
+  /* mapa */
+  .mapas { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 16px; }
+  .mapa-op { border: 1px solid var(--border); border-radius: 14px; padding: 16px; display: grid; gap: 10px; align-content: start; }
+  .mapa-op b { font-family: var(--display); font-size: 15px; color: var(--primary); }
+  .mapa-op p { margin: 0; color: var(--text-light); font-size: 13px; line-height: 1.45; }
+
+  /* link marcado */
+  .gerar { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; align-items: center; }
+  .gerar select, .gerar input { min-height: 40px; border: 1px solid var(--border); border-radius: 12px; padding: 0 12px; background: var(--white); font-size: 15px; }
+  .gerar code { flex: 1 1 320px; min-width: 0; padding: 10px 12px; border-radius: 12px; background: var(--fundo); font-size: 13px; overflow-wrap: anywhere; }
+
+  /* visitas */
+  .tabela { margin-top: 14px; overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; min-width: 760px; }
+  th { text-align: left; font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--text-light); padding: 10px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  td { padding: 11px 10px; border-bottom: 1px solid var(--linha); vertical-align: top; font-size: 13.5px; }
+  tr.visita { cursor: pointer; }
+  tr.visita:hover td { background: #faf8f5; }
+  td .cap { text-transform: capitalize; }
+  .selo { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 700; border-radius: 999px; padding: 2px 9px; white-space: nowrap; }
+  .selo.wa { background: var(--verde-leve); color: var(--verde); }
+  .selo.nao { background: var(--linha); color: var(--text-fraco); }
+  .selo.volta { background: var(--ambar-leve); color: var(--ambar); }
+  .caminho { display: flex; flex-wrap: wrap; gap: 5px; padding: 4px 0 6px; }
+  .caminho span { font-size: 12px; background: var(--fundo); border-radius: 8px; padding: 3px 8px; color: var(--text); }
+  .caminho span.ult { background: var(--grafite); color: var(--white); }
+  .pags { display: inline-flex; align-items: center; gap: 8px; }
+  .pags .mini { width: 60px; height: 5px; border-radius: 3px; background: var(--linha); overflow: hidden; }
+  .pags .mini i { display: block; height: 100%; background: var(--primary); }
+
+  .aviso { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); background: var(--grafite); color: var(--white); padding: 12px 18px; border-radius: 12px; box-shadow: 0 16px 40px rgba(0, 0, 0, .25); z-index: 50; font-weight: 600; max-width: calc(100vw - 32px); }
+  .aviso.erro { background: var(--accent); }
+
+  @media (max-width: 1000px) {
+    .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .kpi.destaque { grid-column: 1 / -1; }
+    .tres, .mapas { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 760px) {
+    .entrada { grid-template-columns: 1fr; }
+    .entrada-lado { padding: 32px 24px; gap: 24px; }
+    .topo .quem { display: none; }
+    .topo .bt { margin-left: auto; }
+    .cabeca h1 { font-size: 26px; }
+    .funil li { grid-template-columns: 28px minmax(0, 1fr) 74px; }
+    .funil .trilho { grid-column: 2 / -1; grid-row: 2; }
+    .cartao { padding: 18px 16px; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+</style>
+</head>
+<body>
+
+<div class="entrada" id="telaEntrar" hidden>
+  <div class="entrada-lado">
+    <img src="logo-dpr-claro.png" alt="DPR Construtora">
+    <div>
+      <h2 class="entrada-titulo">Quem abriu o <span>book</span> do Caucaia II.</h2>
+      <p class="entrada-texto">Visitas, de onde vieram, até onde leram, quem chamou no WhatsApp e o mapa de calor das páginas. Tudo anônimo.</p>
+    </div>
+    <small style="color:rgba(255,255,255,.4)">Uso interno da equipe DPR</small>
+  </div>
+  <div class="entrada-form">
+    <form class="cartao-entrar" id="formEntrar" novalidate>
+      <h1>Entrar</h1>
+      <p>Use o mesmo e-mail e senha da equipe (Financeiro, Backoffice).</p>
+      <div class="campo"><label for="email">E-mail</label><input id="email" type="email" autocomplete="username" required></div>
+      <div class="campo"><label for="senha">Senha</label><input id="senha" type="password" autocomplete="current-password" required></div>
+      <div class="recado" id="recadoEntrar" role="alert"></div>
+      <button class="bt cheio" type="submit" id="btEntrar">Entrar</button>
+    </form>
+  </div>
+</div>
+
+<div id="app" hidden>
+  <header class="topo">
+    <img src="logo-dpr-claro.png" alt="DPR Construtora">
+    <div class="titulo"><b>Leads do Book</b><small>Villagio Caucaia II</small></div>
+    <span class="quem" id="quemEmail"></span>
+    <button class="bt" type="button" id="btSair">Sair</button>
+  </header>
+  <main class="conteudo">
+    <div class="cabeca">
+      <div>
+        <h1>Quem entrou no book</h1>
+        <p>Visitas ao <a href="https://caucaia2.construtoradpr.com.br/" target="_blank" rel="noopener">caucaia2.construtoradpr.com.br</a>. Cada visita é uma aba aberta; ninguém é identificado por nome ou telefone.</p>
+      </div>
+      <div class="periodo" role="group" aria-label="Período">
+        <button type="button" data-dias="7">7 dias</button><button type="button" data-dias="30" class="ativo">30 dias</button><button type="button" data-dias="90">90 dias</button><button type="button" data-dias="180">180 dias</button>
+      </div>
+    </div>
+    <div class="aviso-erro" id="erroGeral" hidden></div>
+
+    <section class="kpis" aria-label="Resumo">
+      <div class="kpi destaque"><span>Chamaram no WhatsApp</span><b class="num" id="kWa">0</b><small id="kConv">0% das visitas</small></div>
+      <div class="kpi"><span>Visitas</span><b class="num" id="kVisitas">0</b><small>abas abertas no período</small></div>
+      <div class="kpi"><span>Pessoas</span><b class="num" id="kUnicos">0</b><small id="kVoltaram">0 voltaram</small></div>
+      <div class="kpi"><span>Tempo típico</span><b class="num" id="kTempo">0s</b><small>metade fica mais que isso</small></div>
+      <div class="kpi"><span>Leram até o fim</span><b class="num" id="kFim">0%</b><small>chegaram em "Fale com a DPR"</small></div>
+    </section>
+
+    <section class="cartao">
+      <h2>Visitas por dia</h2>
+      <div class="dias" id="dias"></div>
+      <div class="legenda"><span><i></i>Visitas</span><span><i class="wa"></i>Chamaram no WhatsApp</span></div>
+    </section>
+
+    <div class="tres">
+      <section class="cartao"><h2>De onde vieram</h2><ul class="lista-barras" id="origens"></ul></section>
+      <section class="cartao"><h2>Aparelho</h2><ul class="lista-barras" id="aparelhos"></ul></section>
+      <section class="cartao"><h2>Cidades</h2><p class="sub">Aproximada, pelo provedor de internet.</p><ul class="lista-barras" id="cidades"></ul></section>
+    </div>
+
+    <section class="cartao">
+      <h2>Até onde leram</h2>
+      <p class="sub">Quantas visitas chegaram a cada página do book, na ordem do book.</p>
+      <ul class="funil" id="funil"></ul>
+    </section>
+
+    <section class="cartao">
+      <h2>Mapa de calor</h2>
+      <p class="sub">Abre o book de verdade com o calor desenhado por cima. O desenho do book muda entre celular e computador: abra o mapa de celular no celular e o de computador no computador.</p>
+      <div class="mapas">
+        <div class="mapa-op"><b>Cliques no celular</b><p>Onde as pessoas tocaram, no celular.</p><button class="bt cheio" type="button" data-mapa="click" data-aparelho="celular">Abrir mapa</button></div>
+        <div class="mapa-op"><b>Cliques no computador</b><p>Onde clicaram com o mouse.</p><button class="bt cheio" type="button" data-mapa="click" data-aparelho="computador">Abrir mapa</button></div>
+        <div class="mapa-op"><b>Movimento do mouse</b><p>Por onde o mouse passou: o que chamou a atenção no computador.</p><button class="bt cheio" type="button" data-mapa="move" data-aparelho="computador">Abrir mapa</button></div>
+      </div>
+    </section>
+
+    <section class="cartao">
+      <h2>Links marcados para divulgar</h2>
+      <p class="sub">Use um link diferente em cada canal: assim o painel mostra de onde veio cada visita. Quem chega sem marca aparece pelo site de origem ou como "direto".</p>
+      <div class="gerar">
+        <select id="canal" aria-label="Canal">
+          <option value="instagram">Instagram</option><option value="facebook">Facebook</option><option value="whatsapp">WhatsApp (listas e grupos)</option>
+          <option value="google">Google (anúncio)</option><option value="qr">QR code impresso</option><option value="email">E-mail</option><option value="corretor">Corretor</option>
+        </select>
+        <code id="linkMarcado"></code>
+        <button class="bt" type="button" id="btCopiar">Copiar link</button>
+      </div>
+    </section>
+
+    <section class="cartao">
+      <h2>Visitas</h2>
+      <p class="sub">As 200 mais recentes do período. Toque numa visita para ver o caminho que a pessoa fez no book.</p>
+      <div class="tabela">
+        <table>
+          <thead><tr><th>Quando</th><th>De onde</th><th>Aparelho</th><th>Cidade</th><th>Tempo</th><th>Páginas</th><th>WhatsApp</th></tr></thead>
+          <tbody id="linhas"></tbody>
+        </table>
+      </div>
+      <button class="bt" type="button" id="maisVisitas" style="margin-top:14px" hidden>Mostrar mais</button>
+    </section>
+  </main>
+</div>
+
+<div class="aviso" id="aviso" role="status" hidden></div>
+
+<script>
+(function () {
+  const SUPABASE_URL = 'https://roashkfdjgsweuftqhyx.supabase.co';
+  const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_T4u8FTh9_VvBtW7Ycxw4FQ_dHu0n5tT';
+  const BOOK = 'https://caucaia2.construtoradpr.com.br/';
+  const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+  const $ = (id) => document.getElementById(id);
+  const estado = { dias: 30, dados: null, mostrar: 25 };
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const numero = (n) => Number(n || 0).toLocaleString('pt-BR');
+  const ORIGENS = { instagram: 'Instagram', facebook: 'Facebook', whatsapp: 'WhatsApp', google: 'Google', qr: 'QR code', email: 'E-mail', corretor: 'Corretor', youtube: 'YouTube', tiktok: 'TikTok', direto: 'Direto (link ou digitado)', 'site-dpr': 'Site da DPR', 'outro-site': 'Outro site' };
+  const APARELHOS = { celular: 'Celular', tablet: 'Tablet', computador: 'Computador' };
+  const nomeOrigem = (o) => ORIGENS[o] || (o ? o.charAt(0).toUpperCase() + o.slice(1).replace(/-/g, ' ') : 'Direto');
+  function tempo(seg) { seg = Math.round(seg || 0); if (seg < 60) return seg + 's'; const m = Math.floor(seg / 60), s = seg % 60; return m < 60 ? m + 'min' + (s ? ' ' + s + 's' : '') : Math.floor(m / 60) + 'h ' + (m % 60) + 'min'; }
+  function quando(iso) { const d = new Date(iso); return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) + ' ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }); }
+  let relogio = null;
+  function avisar(t, tipo) { const a = $('aviso'); a.textContent = t; a.className = 'aviso' + (tipo === 'erro' ? ' erro' : ''); a.hidden = false; clearTimeout(relogio); relogio = setTimeout(() => { a.hidden = true; }, 4500); }
+  function tela(qual) { $('telaEntrar').hidden = qual !== 'entrar'; $('app').hidden = qual !== 'app'; }
+
+  async function api(caminho, opcoes) {
+    const { data } = await sb.auth.getSession();
+    const token = data && data.session ? data.session.access_token : '';
+    const r = await fetch(caminho, Object.assign({ headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' } }, opcoes || {}));
+    let corpo = {}; try { corpo = await r.json(); } catch (e) { corpo = { erro: 'Resposta inesperada do servidor (' + r.status + ').' }; }
+    if (r.status === 401) { await sb.auth.signOut(); tela('entrar'); $('recadoEntrar').textContent = 'Sua sessão venceu. Entre de novo.'; throw Object.assign(new Error('sessão'), { tratado: true }); }
+    if (!r.ok) throw new Error(corpo.erro || ('Erro ' + r.status));
+    return corpo;
+  }
+
+  // ---- entrar / sair
+  async function aoEntrar(sessao) {
+    $('quemEmail').textContent = sessao.user.email || '';
+    tela('app');
+    carregar();
+  }
+  $('formEntrar').addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    $('recadoEntrar').textContent = '';
+    $('btEntrar').disabled = true; $('btEntrar').textContent = 'Entrando...';
+    const { data, error } = await sb.auth.signInWithPassword({ email: $('email').value.trim().toLowerCase(), password: $('senha').value });
+    $('btEntrar').disabled = false; $('btEntrar').textContent = 'Entrar';
+    if (error) { $('recadoEntrar').textContent = /invalid login/i.test(error.message) ? 'E-mail ou senha incorretos.' : 'Não foi possível entrar. Tente de novo.'; return; }
+    aoEntrar(data.session);
+  });
+  $('btSair').addEventListener('click', async () => { try { await sb.auth.signOut(); } catch (e) { /* sai mesmo assim */ } location.reload(); });
+
+  // ---- dados
+  async function carregar() {
+    $('erroGeral').hidden = true;
+    try {
+      estado.dados = await api('/api/resumo?dias=' + estado.dias);
+      desenhar();
+    } catch (e) {
+      if (e.tratado) return;
+      $('erroGeral').textContent = e.message; $('erroGeral').hidden = false;
+    }
+  }
+  function barras(lista, total, alvo, nomear) {
+    $(alvo).innerHTML = lista.length ? lista.map((x) => { const nome = x.nome === 'não informado' ? 'Não informado' : nomear ? nomear(x.nome) : x.nome; return '<li><b title="' + esc(nome) + '">' + esc(nome) + '</b><em class="num">' + numero(x.n) + ' · ' + (total ? Math.round(x.n / total * 100) : 0) + '%</em><span class="trilho"><i style="width:' + (total ? Math.max(2, x.n / total * 100) : 0) + '%"></i></span></li>'; }).join('') : '<li class="vazio">Sem visitas no período.</li>';
+  }
+  function desenhar() {
+    const d = estado.dados, r = d.resumo, total = r.total;
+    $('kWa').textContent = numero(r.whatsapp);
+    $('kConv').textContent = String(r.conversao).replace('.', ',') + '% das visitas';
+    $('kVisitas').textContent = numero(total);
+    $('kUnicos').textContent = numero(r.unicos);
+    $('kVoltaram').textContent = numero(r.voltaram) + (r.voltaram === 1 ? ' voltou' : ' voltaram') + ' outra vez';
+    $('kTempo').textContent = tempo(r.tempoMediano);
+    const fim = r.funil.length ? r.funil[r.funil.length - 1].n : 0;
+    $('kFim').textContent = (total ? Math.round(fim / total * 100) : 0) + '%';
+    // dias: todos os dias do periodo, mesmo os sem visita
+    const mapa = {}; r.porDia.forEach((x) => { mapa[x.dia] = x; });
+    const dias = []; const hoje = new Date();
+    for (let i = estado.dias - 1; i >= 0; i--) { const t = new Date(hoje.getTime() - i * 86400e3); const k = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(t); dias.push(mapa[k] || { dia: k, visitas: 0, whatsapp: 0 }); }
+    const max = Math.max(1, ...dias.map((x) => x.visitas));
+    const passo = Math.ceil(dias.length / 8);
+    $('dias').innerHTML = dias.map((x, i) => '<div class="dia" title="' + x.dia.split('-').reverse().join('/') + ': ' + x.visitas + ' visitas, ' + x.whatsapp + ' no WhatsApp"><div class="barra" style="height:' + (x.visitas / max * 100) + '%"><i style="height:' + (x.visitas ? x.whatsapp / x.visitas * 100 : 0) + '%"></i></div>' + (i % passo === 0 || i === dias.length - 1 ? '<small>' + x.dia.slice(8) + '/' + x.dia.slice(5, 7) + '</small>' : '') + '</div>').join('');
+    barras(r.origens, total, 'origens', nomeOrigem); barras(r.aparelhos, total, 'aparelhos', (a) => APARELHOS[a] || a); barras(r.cidades, total, 'cidades');
+    $('funil').innerHTML = r.funil.map((s, i) => '<li><span class="pg">' + (s.id === 'obra' ? 'obra' : s.id.slice(1)) + '</span><span class="nome">' + esc(s.nome) + '</span><span class="trilho"><i style="width:' + (total ? s.n / total * 100 : 0) + '%"></i></span><span class="val num"><b>' + numero(s.n) + '</b> · ' + (total ? Math.round(s.n / total * 100) : 0) + '%</span></li>').join('');
+    const nomes = {}; d.secoes.forEach(([id, nome]) => { nomes[id] = nome; });
+    $('maisVisitas').hidden = d.visitas.length <= estado.mostrar;
+    $('maisVisitas').textContent = 'Mostrar mais (' + Math.min(25, d.visitas.length - estado.mostrar) + ' de ' + (d.visitas.length - estado.mostrar) + ' restantes)';
+    $('linhas').innerHTML = d.visitas.length ? d.visitas.slice(0, estado.mostrar).map((v, i) => {
+      const seg = (new Date(v.ultima_em) - new Date(v.inicio)) / 1000;
+      const n = v.secoes.length, pct = Math.round(n / d.secoes.length * 100);
+      return '<tr class="visita" data-i="' + i + '" tabindex="0" aria-expanded="false"><td class="num">' + quando(v.inicio) + (v.novo ? '' : ' <span class="selo volta">voltou</span>') + '</td><td>' + esc(nomeOrigem(v.origem)) + (v.campanha ? '<br><small style="color:var(--text-light)">' + esc(v.campanha) + '</small>' : '') + '</td><td>' + esc(APARELHOS[v.aparelho] || v.aparelho || '') + '</td><td>' + esc(v.cidade ? v.cidade + (v.estado ? ' / ' + v.estado : '') : '—') + '</td><td class="num">' + tempo(seg) + '</td><td><span class="pags"><span class="mini"><i style="width:' + pct + '%"></i></span><span class="num">' + n + ' de ' + d.secoes.length + '</span></span></td><td>' + (v.whatsapp ? '<span class="selo wa">chamou</span>' : '<span class="selo nao">não</span>') + '</td></tr>'
+        + '<tr data-caminho="' + i + '" hidden><td colspan="7"><div class="caminho">' + (n ? v.secoes.map((s, j) => '<span' + (j === n - 1 ? ' class="ult"' : '') + '>' + esc(nomes[s] || s) + '</span>').join('') : '<span>Saiu antes de ver a primeira página inteira</span>') + '</div></td></tr>';
+    }).join('') : '<tr><td colspan="7" class="vazio">Nenhuma visita no período.</td></tr>';
+  }
+  function alternarCaminho(tr) {
+    const i = tr.dataset.i, linha = document.querySelector('[data-caminho="' + i + '"]');
+    linha.hidden = !linha.hidden; tr.setAttribute('aria-expanded', String(!linha.hidden));
+  }
+  $('linhas').addEventListener('click', (ev) => { const tr = ev.target.closest('tr.visita'); if (tr) alternarCaminho(tr); });
+  $('linhas').addEventListener('keydown', (ev) => { if ((ev.key === 'Enter' || ev.key === ' ') && ev.target.matches('tr.visita')) { ev.preventDefault(); alternarCaminho(ev.target); } });
+  document.querySelectorAll('[data-dias]').forEach((b) => b.addEventListener('click', () => {
+    document.querySelectorAll('[data-dias]').forEach((x) => x.classList.toggle('ativo', x === b));
+    estado.dias = Number(b.dataset.dias); estado.mostrar = 25; carregar();
+  }));
+  $('maisVisitas').addEventListener('click', () => { estado.mostrar += 25; desenhar(); });
+
+  // ---- mapa: a aba abre antes do pedido (senao o navegador bloqueia o pop-up)
+  document.querySelectorAll('[data-mapa]').forEach((b) => b.addEventListener('click', async () => {
+    const aba = window.open('', '_blank');
+    try {
+      const r = await api('/api/ticket', { method: 'POST' });
+      const h = new URLSearchParams({ mapaleads: r.bilhete, tipo: b.dataset.mapa, aparelho: b.dataset.aparelho, dias: String(estado.dias) });
+      if (aba) aba.location = BOOK + '#' + h.toString(); else location.href = BOOK + '#' + h.toString();
+    } catch (e) {
+      if (aba) aba.close();
+      if (!e.tratado) avisar(e.message, 'erro');
+    }
+  }));
+
+  // ---- link marcado
+  function linkMarcado() { $('linkMarcado').textContent = BOOK + '?origem=' + $('canal').value; }
+  $('canal').addEventListener('change', linkMarcado);
+  $('btCopiar').addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText($('linkMarcado').textContent); avisar('Link copiado.'); } catch (e) { avisar('Não deu para copiar: selecione o link e copie à mão.', 'erro'); }
+  });
+  linkMarcado();
+
+  sb.auth.getSession().then(({ data }) => { if (data && data.session) aoEntrar(data.session); else tela('entrar'); });
+})();
+</script>
+</body>
+</html>
